@@ -13,11 +13,11 @@ app = Flask(__name__)
 NOME_LOJA = "PSIU! BURG"
 WHATSAPP_LOJA = "5566981413953"   # WhatsApp oficial da PSIU! BURG
 CHAVE_PIX = "psiuburg@pix.com.br" # Troque pela chave Pix real quando tiver
+ENDERECO_LOJA = "Avenida Guarapuava, 1735 - Jardim Rondônia, Rondonópolis - MT"
+INSTAGRAM_LOJA = "https://www.instagram.com/psiuburg?knvt=aWxnNmx1b3F1MWV3"
 FUSO_HORARIO = timezone(timedelta(hours=-4))  # Horario de MT (UTC-4)
 
-# Configuracao do Banco de Dados Permanente (PostgreSQL)
-# Se DATABASE_URL estiver configurada no Render, usa banco permanente.
-# Caso contrario, usa SQLite local para nao dar erro.
+# Configuracao do Banco de Dados Permanente (PostgreSQL no Neon)
 db_url = os.environ.get("DATABASE_URL", "sqlite:///psiuburg.db")
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
@@ -83,7 +83,7 @@ class Pedido(db.Model):
     __tablename__ = "pedidos"
     id = db.Column(db.Integer, primary_key=True)
     data_hora = db.Column(db.String(30), nullable=False)
-    mes_ano = db.Column(db.String(10), nullable=False)  # Ex: "2026-11" para filtro mensal
+    mes_ano = db.Column(db.String(10), nullable=False)  # Ex: "2026-11"
     cliente_nome = db.Column(db.String(150), nullable=False)
     cliente_whatsapp = db.Column(db.String(30), nullable=False)
     tipo_entrega = db.Column(db.String(30), nullable=False)
@@ -181,6 +181,8 @@ def api_dados():
         "loja": NOME_LOJA,
         "whatsapp": WHATSAPP_LOJA,
         "chave_pix": CHAVE_PIX,
+        "endereco_loja": ENDERECO_LOJA,
+        "instagram": INSTAGRAM_LOJA,
         "produtos": produtos,
         "bairros": bairros,
         "adicionais": ADICIONAIS_PADRAO
@@ -197,7 +199,6 @@ def buscar_cliente():
     if not cli:
         return jsonify({"encontrado": False})
 
-    # Busca os ultimos 10 pedidos desse cliente
     pedidos = Pedido.query.filter_by(cliente_whatsapp=fone).order_by(Pedido.id.desc()).limit(10).all()
     return jsonify({
         "encontrado": True,
@@ -247,7 +248,6 @@ def criar_pedido():
     forma_pag = dados.get("forma_pagamento", "Pix")
     status_pag = "Aguardando Pagamento" if forma_pag in ["Pix", "Cartão Online (Link)"] else "Pagar na Entrega"
 
-    # Salva ou atualiza o cadastro do cliente automaticamente
     if fone and nome:
         cli = Cliente.query.filter_by(whatsapp=fone).first()
         if cli:
@@ -325,7 +325,6 @@ def atualizar_pagamento(pedido_id):
 
 @app.route("/api/admin/financeiro")
 def relatorio_financeiro():
-    """Retorna o fluxo de caixa e historico de pedidos de um mes especifico (YYYY-MM)."""
     mes_atual = datetime.now(FUSO_HORARIO).strftime("%Y-%m")
     mes = request.args.get("mes", mes_atual)
 
@@ -457,6 +456,7 @@ TEMPLATE_RECIBO_80MM = """
 </head>
 <body>
     <div class="centro negrito grande">{{ loja }}</div>
+    <div class="centro" style="font-size: 11px;">{{ endereco_loja }}</div>
     <div class="centro">COMANDA DE COZINHA / DELIVERY</div>
     <div class="linha"></div>
     <div class="negrito grande centro">PEDIDO #{{ p.id }}</div>
@@ -519,7 +519,12 @@ TEMPLATE_RECIBO_80MM = """
 @app.route("/imprimir/<int:pedido_id>")
 def imprimir_pedido(pedido_id):
     p = Pedido.query.get_or_404(pedido_id)
-    return render_template_string(TEMPLATE_RECIBO_80MM, p=p.to_dict(), loja=NOME_LOJA)
+    return render_template_string(
+        TEMPLATE_RECIBO_80MM,
+        p=p.to_dict(),
+        loja=NOME_LOJA,
+        endereco_loja=ENDERECO_LOJA
+    )
 
 
 if __name__ == "__main__":
