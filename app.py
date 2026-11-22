@@ -3,7 +3,7 @@ import os
 import json
 import sqlite3
 from datetime import datetime, timedelta, timezone
-from flask import Flask, render_template, render_template_string, request, jsonify
+from flask import Flask, render_template, render_template_string, request, jsonify, send_from_directory
 
 app = Flask(__name__)
 
@@ -11,7 +11,7 @@ app = Flask(__name__)
 # 1. CONFIGURAÇÕES DA LANCHONETE (EDITE AQUI)
 # ==========================================
 NOME_LOJA = "PSIU! BURG"
-WHATSAPP_LOJA = "5565999999999"   # 55 + DDD + Numero (so numeros)
+WHATSAPP_LOJA = "5566981413953"   # WhatsApp oficial da PSIU! BURG (55 + 66 + 981413953)
 CHAVE_PIX = "psiuburg@pix.com.br" # Chave Pix real da lanchonete
 FUSO_HORARIO = timezone(timedelta(hours=-4))  # Horario de MT (UTC-4)
 
@@ -78,7 +78,6 @@ def init_db():
         )
     """)
 
-    # Garante compatibilidade caso o banco ja existisse antes dessa atualizacao
     for coluna_sql in [
         "ALTER TABLE pedidos ADD COLUMN status_pagamento TEXT DEFAULT 'Pagar na Entrega'",
         "ALTER TABLE pedidos ADD COLUMN link_pagamento TEXT DEFAULT ''"
@@ -88,7 +87,6 @@ def init_db():
         except sqlite3.OperationalError:
             pass
 
-    # Cardápio fictício inicial
     cur.execute("SELECT COUNT(*) FROM produtos")
     if cur.fetchone()[0] == 0:
         produtos_iniciais = [
@@ -108,7 +106,6 @@ def init_db():
             produtos_iniciais
         )
 
-    # Taxas iniciais por Bairro / KM
     cur.execute("SELECT COUNT(*) FROM bairros")
     if cur.fetchone()[0] == 0:
         bairros_iniciais = [
@@ -126,7 +123,7 @@ def init_db():
 init_db()
 
 # ==========================================
-# 3. ROTAS DE PÁGINAS
+# 3. ROTAS DE PÁGINAS E LOGO
 # ==========================================
 @app.route("/")
 def pagina_cliente():
@@ -136,6 +133,15 @@ def pagina_cliente():
 @app.route("/painel")
 def pagina_admin():
     return render_template("admin.html", nome_loja=NOME_LOJA)
+
+
+@app.route("/logo")
+def servir_logo():
+    """Encontra automaticamente o arquivo da logo na raiz do repositorio."""
+    for nome in ["logo.png", "logo.jpg", "logo.jpeg", "logo.png.png", "logo.jpg.jpeg"]:
+        if os.path.exists(nome):
+            return send_from_directory(".", nome)
+    return "", 404
 
 
 # ==========================================
@@ -163,7 +169,6 @@ def criar_pedido():
     agora = datetime.now(FUSO_HORARIO).strftime("%d/%m/%Y %H:%M")
     forma_pag = dados.get("forma_pagamento", "Pix")
 
-    # Define o status inicial do pagamento automaticamente
     if forma_pag in ["Pix", "Cartão Online (Link)"]:
         status_pag = "Aguardando Pagamento"
     else:
@@ -239,7 +244,6 @@ def atualizar_status(pedido_id):
 
 @app.route("/api/admin/pedidos/<int:pedido_id>/pagamento", methods=["POST"])
 def atualizar_pagamento(pedido_id):
-    """Permite confirmar pagamento ou salvar o Link da Ton gerado no celular."""
     d = request.json or {}
     conn = conectar_db()
     if "status_pagamento" in d:
@@ -253,11 +257,6 @@ def atualizar_pagamento(pedido_id):
 
 @app.route("/api/webhook/pagamento", methods=["POST"])
 def webhook_pagamento():
-    """
-    Rota ja estruturada para integracao futura com gateway de API aberta
-    (ex: Mercado Pago ou Pagar.me). Quando o pagamento for aprovado,
-    esta rota recebe a notificacao e marca o pedido como 'Pago' sozinha.
-    """
     dados = request.json or {}
     pedido_id = dados.get("pedido_id") or dados.get("external_reference")
     status_evento = str(dados.get("status", "")).lower()
