@@ -38,7 +38,6 @@
             color: #fff; text-decoration: none; padding: 5px 14px; border-radius: 20px;
             font-size: 13px; font-weight: bold; border: none; cursor: pointer;
         }
-        .btn-insta:hover { opacity: 0.9; }
 
         .categorias {
             display: flex; gap: 8px; overflow-x: auto; padding: 14px 16px;
@@ -89,6 +88,7 @@
             width: 100%; background: #101010; border: 1px solid #333; color: #fff;
             padding: 11px; border-radius: 8px; font-size: 14px;
         }
+        .grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
         .btn-principal {
             width: 100%; background: var(--amarelo); color: #000; border: none;
             padding: 14px; border-radius: 10px; font-size: 16px; font-weight: 800; cursor: pointer; margin-top: 16px;
@@ -96,6 +96,10 @@
         .btn-secundario {
             background: #2b2b2b; color: #fff; border: 1px solid #444;
             padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 13px;
+        }
+        .btn-gps {
+            width: 100%; background: #102a38; color: #4fc3f7; border: 1px solid #29b6f6;
+            padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 13px;
         }
         .link-troca { text-align: center; margin-top: 14px; font-size: 14px; color: var(--cinza); }
         .link-troca a { color: var(--amarelo); font-weight: bold; text-decoration: underline; cursor: pointer; }
@@ -191,7 +195,7 @@
 
         <!-- TELA 2: CADASTRO -->
         <div id="telaCadastro" style="display:none;">
-            <p style="font-size:13px; color:var(--cinza); margin-bottom:10px;">
+            <p style="font-size:13px; color:var(--cinza); margin-bottom:6px;">
                 Preencha uma única vez para agilizar seus próximos pedidos!
             </p>
             <label>Seu Nome:</label>
@@ -200,12 +204,27 @@
             <label>Seu WhatsApp (com DDD):</label>
             <input id="cadWhats" placeholder="Ex: 66999998888" type="tel">
 
-            <label>Bairro / Distância Padrão:</label>
-            <select id="cadBairro"></select>
+            <label>CEP (preenche rua e bairro sozinho):</label>
+            <input id="cadCep" placeholder="Ex: 78700-000" maxlength="9" onblur="buscarCep('cad')">
 
-            <label>Endereço Completo:</label>
-            <input id="cadEndereco" placeholder="Rua, número, ponto de referência">
+            <div class="grid-2">
+                <div>
+                    <label>Rua / Avenida:</label>
+                    <input id="cadRua" placeholder="Nome da rua">
+                </div>
+                <div>
+                    <label>Número:</label>
+                    <input id="cadNumero" placeholder="Ex: 123">
+                </div>
+            </div>
 
+            <label>Bairro:</label>
+            <input id="cadBairro" placeholder="Ex: Jardim Rondônia">
+
+            <label>Complemento / Ponto de Referência (opcional):</label>
+            <input id="cadComp" placeholder="Ex: Casa 2, portão preto">
+
+            <button class="btn-gps" id="btnGpsCad" onclick="capturarGPS('cad')">📍 Usar minha localização atual (GPS)</button>
             <button class="btn-principal" onclick="salvarCadastro()">✅ Criar meu cadastro</button>
 
             <div class="link-troca">
@@ -221,11 +240,27 @@
             <label>Seu WhatsApp:</label>
             <input id="perfWhats" readonly style="opacity:0.7;">
 
-            <label>Bairro / Distância Padrão:</label>
-            <select id="perfBairro"></select>
+            <label>CEP:</label>
+            <input id="perfCep" maxlength="9" onblur="buscarCep('perf')">
 
-            <label>Endereço Completo:</label>
-            <input id="perfEndereco">
+            <div class="grid-2">
+                <div>
+                    <label>Rua / Avenida:</label>
+                    <input id="perfRua">
+                </div>
+                <div>
+                    <label>Número:</label>
+                    <input id="perfNumero">
+                </div>
+            </div>
+
+            <label>Bairro:</label>
+            <input id="perfBairro">
+
+            <label>Complemento / Referência:</label>
+            <input id="perfComp">
+
+            <button class="btn-gps" id="btnGpsPerf" onclick="capturarGPS('perf')">📍 Atualizar localização atual (GPS)</button>
 
             <div style="display:flex; gap:8px; margin-top:14px;">
                 <button class="btn-principal" style="margin-top:0;" onclick="atualizarPerfil()">💾 Salvar Alterações</button>
@@ -289,19 +324,34 @@
         </div>
 
         <div id="areaEndereco">
-            <label>Bairro / Distância (Taxa de Entrega):</label>
-            <select id="ckBairro" onchange="atualizarResumoCheckout()"></select>
+            <label>CEP:</label>
+            <input id="ckCep" placeholder="Ex: 78700-000" maxlength="9" onblur="buscarCep('ck')">
 
-            <label>Endereço Completo (Rua, Número, Ponto de Referência):</label>
-            <input id="ckEndereco" placeholder="Ex: Rua das Flores, 123 - Casa amarela">
+            <div class="grid-2">
+                <div>
+                    <label>Rua / Avenida:</label>
+                    <input id="ckRua" placeholder="Nome da rua" onblur="calcularFreteAtual()">
+                </div>
+                <div>
+                    <label>Número:</label>
+                    <input id="ckNumero" placeholder="Ex: 123" onblur="calcularFreteAtual()">
+                </div>
+            </div>
+
+            <label>Bairro:</label>
+            <input id="ckBairro" placeholder="Ex: Jardim Rondônia" onblur="calcularFreteAtual()">
+
+            <label>Complemento / Ponto de Referência:</label>
+            <input id="ckComp" placeholder="Ex: Casa amarela, próximo ao mercado">
+
+            <button class="btn-gps" id="btnGpsCk" onclick="capturarGPS('ck')">📍 Usar minha localização atual (GPS)</button>
         </div>
 
         <div id="areaRetiradaInfo" class="box-info" style="display:none;">
             🏪 <strong>Retirada no Balcão (Grátis):</strong><br>
             Avenida Guarapuava, 1735 - Jardim Rondônia, Rondonópolis - MT<br>
             <a href="https://www.google.com/maps/search/?api=1&query=Avenida+Guarapuava+1735+Jardim+Rondonia+Rondonopolis+MT"
-               target="_blank"
-               style="color: var(--amarelo); font-weight: bold;">
+               target="_blank" style="color: var(--amarelo); font-weight: bold;">
                📍 Abrir rota no Google Maps
             </a>
         </div>
@@ -330,7 +380,9 @@
 
         <div style="margin-top: 14px; padding-top: 10px; border-top: 1px dashed #444; font-size: 15px;">
             <div style="display:flex; justify-content:space-between;"><span>Subtotal:</span> <span id="resSub">R$ 0,00</span></div>
-            <div style="display:flex; justify-content:space-between; color:var(--cinza);"><span>Taxa de Entrega:</span> <span id="resTaxa">R$ 0,00</span></div>
+            <div style="display:flex; justify-content:space-between; color:var(--cinza);">
+                <span id="labelTaxa">Taxa de Entrega:</span> <span id="resTaxa">Calculando...</span>
+            </div>
             <div style="display:flex; justify-content:space-between; font-size:19px; font-weight:900; color:var(--amarelo); margin-top:6px;">
                 <span>Total:</span> <span id="resTotal">R$ 0,00</span>
             </div>
@@ -359,7 +411,7 @@
 </div>
 
 <script>
-    let DADOS = { produtos: [], bairros: [], adicionais: [], chave_pix: "", whatsapp: "" };
+    let DADOS = { produtos: [], adicionais: [], chave_pix: "", whatsapp: "" };
     let categoriaAtual = "Todos";
     let carrinho = [];
     let produtoSelecionado = null;
@@ -368,23 +420,87 @@
     let ultimoPedido = null;
     let timerRastreio = null;
 
+    // Estado de geolocalizacao e frete calculado
+    let gpsLat = null;
+    let gpsLng = null;
+    let taxaCalculada = 0.0;
+    let distanciaCalculada = 0.0;
+    let linkMapsCalculado = "";
+
     const fmt = v => "R$ " + Number(v).toFixed(2).replace(".", ",");
 
     async function carregarCardapio() {
         const r = await fetch("/api/dados");
         DADOS = await r.json();
         document.getElementById("textoChavePix").innerText = DADOS.chave_pix;
-
-        const opcoesBairro = DADOS.bairros.map(b =>
-            `<option value="${b.nome}" data-taxa="${b.taxa}">${b.nome} (+ ${fmt(b.taxa)})</option>`
-        ).join("");
-        document.getElementById("ckBairro").innerHTML = opcoesBairro;
-        document.getElementById("cadBairro").innerHTML = opcoesBairro;
-        document.getElementById("perfBairro").innerHTML = opcoesBairro;
-
         carregarClienteLocal();
         renderizarCategorias();
         renderizarProdutos();
+    }
+
+    async function buscarCep(prefixo) {
+        const cep = document.getElementById(prefixo + "Cep").value.replace(/\D/g, "");
+        if (cep.length !== 8) return;
+        try {
+            const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+            const d = await r.json();
+            if (!d.erro) {
+                document.getElementById(prefixo + "Rua").value = d.logradouro || "";
+                document.getElementById(prefixo + "Bairro").value = d.bairro || "";
+                if (prefixo === "ck") calcularFreteAtual();
+            }
+        } catch (e) {}
+    }
+
+    function capturarGPS(prefixo) {
+        if (!navigator.geolocation) return alert("Seu navegador não suporta geolocalização.");
+        const btn = document.getElementById("btnGps" + prefixo.charAt(0).toUpperCase() + prefixo.slice(1));
+        btn.innerText = "⏳ Obtendo sua localização...";
+
+        navigator.geolocation.getCurrentPosition(
+            pos => {
+                gpsLat = pos.coords.latitude;
+                gpsLng = pos.coords.longitude;
+                btn.innerText = "✅ Localização GPS capturada!";
+                btn.style.borderColor = "#4cd964";
+                btn.style.color = "#4cd964";
+                if (prefixo === "ck") calcularFreteAtual();
+            },
+            () => {
+                btn.innerText = "📍 Usar minha localização atual (GPS)";
+                alert("Não foi possível acessar o GPS. Preencha seu endereço normalmente!");
+            }
+        );
+    }
+
+    async function calcularFreteAtual() {
+        if (tipoEntrega === "Retirada") {
+            taxaCalculada = 0;
+            atualizarResumoCheckout();
+            return;
+        }
+        const rua = document.getElementById("ckRua").value.trim();
+        const numero = document.getElementById("ckNumero").value.trim();
+        const bairro = document.getElementById("ckBairro").value.trim();
+
+        if (!rua && gpsLat === null) {
+            document.getElementById("resTaxa").innerText = "Informe o endereço";
+            return;
+        }
+
+        document.getElementById("resTaxa").innerText = "Calculando...";
+        const r = await fetch("/api/calcular-frete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lat: gpsLat, lng: gpsLng, rua, numero, bairro })
+        });
+        const d = await r.json();
+        if (d.sucesso) {
+            taxaCalculada = d.taxa;
+            distanciaCalculada = d.distancia_km;
+            linkMapsCalculado = d.link_maps;
+            atualizarResumoCheckout();
+        }
     }
 
     function obterClienteSalvo() {
@@ -402,8 +518,12 @@
         }
         document.getElementById("ckNome").value = c.nome || "";
         document.getElementById("ckWhats").value = c.whatsapp || "";
-        document.getElementById("ckEndereco").value = c.endereco || "";
-        if (c.bairro) document.getElementById("ckBairro").value = c.bairro;
+        document.getElementById("ckCep").value = c.cep || "";
+        document.getElementById("ckRua").value = c.rua || "";
+        document.getElementById("ckNumero").value = c.numero || "";
+        document.getElementById("ckBairro").value = c.bairro || "";
+        document.getElementById("ckComp").value = c.complemento || "";
+        if (c.lat && c.lng) { gpsLat = c.lat; gpsLng = c.lng; }
         if (c.nome) document.getElementById("btnMinhaConta").innerText = `👤 Olá, ${c.nome.split(" ")[0]}`;
     }
 
@@ -411,12 +531,7 @@
         document.getElementById("telaLogin").style.display = tela === "login" ? "block" : "none";
         document.getElementById("telaCadastro").style.display = tela === "cadastro" ? "block" : "none";
         document.getElementById("telaPerfil").style.display = tela === "perfil" ? "block" : "none";
-
-        const titulos = {
-            login: "👤 Fazer Login",
-            cadastro: "📝 Criar Cadastro",
-            perfil: "👤 Minha Conta"
-        };
+        const titulos = { login: "👤 Fazer Login", cadastro: "📝 Criar Cadastro", perfil: "👤 Minha Conta" };
         document.getElementById("tituloModalConta").innerText = titulos[tela];
     }
 
@@ -436,8 +551,11 @@
     function preencherTelaPerfil(c) {
         document.getElementById("perfNome").value = c.nome || "";
         document.getElementById("perfWhats").value = c.whatsapp || "";
-        document.getElementById("perfEndereco").value = c.endereco || "";
-        if (c.bairro) document.getElementById("perfBairro").value = c.bairro;
+        document.getElementById("perfCep").value = c.cep || "";
+        document.getElementById("perfRua").value = c.rua || "";
+        document.getElementById("perfNumero").value = c.numero || "";
+        document.getElementById("perfBairro").value = c.bairro || "";
+        document.getElementById("perfComp").value = c.complemento || "";
     }
 
     async function fazerLogin() {
@@ -450,7 +568,6 @@
             body: JSON.stringify({ whatsapp: whats })
         });
         const d = await r.json();
-
         if (d.encontrado) {
             localStorage.setItem("psiuburg_cliente", JSON.stringify(d.cliente));
             carregarClienteLocal();
@@ -497,8 +614,12 @@
         const payload = {
             whatsapp: document.getElementById("cadWhats").value.trim(),
             nome: document.getElementById("cadNome").value.trim(),
-            bairro: document.getElementById("cadBairro").value,
-            endereco: document.getElementById("cadEndereco").value.trim()
+            cep: document.getElementById("cadCep").value.trim(),
+            rua: document.getElementById("cadRua").value.trim(),
+            numero: document.getElementById("cadNumero").value.trim(),
+            bairro: document.getElementById("cadBairro").value.trim(),
+            complemento: document.getElementById("cadComp").value.trim(),
+            lat: gpsLat, lng: gpsLng
         };
         if (!payload.nome || !payload.whatsapp) return alert("Preencha seu nome e WhatsApp!");
 
@@ -520,8 +641,12 @@
         const payload = {
             whatsapp: document.getElementById("perfWhats").value.trim(),
             nome: document.getElementById("perfNome").value.trim(),
-            bairro: document.getElementById("perfBairro").value,
-            endereco: document.getElementById("perfEndereco").value.trim()
+            cep: document.getElementById("perfCep").value.trim(),
+            rua: document.getElementById("perfRua").value.trim(),
+            numero: document.getElementById("perfNumero").value.trim(),
+            bairro: document.getElementById("perfBairro").value.trim(),
+            complemento: document.getElementById("perfComp").value.trim(),
+            lat: gpsLat, lng: gpsLng
         };
         const r = await fetch("/api/clientes/salvar", {
             method: "POST",
@@ -538,9 +663,8 @@
 
     function sairConta() {
         localStorage.removeItem("psiuburg_cliente");
-        document.getElementById("ckNome").value = "";
-        document.getElementById("ckWhats").value = "";
-        document.getElementById("ckEndereco").value = "";
+        gpsLat = null; gpsLng = null;
+        ["ckNome","ckWhats","ckCep","ckRua","ckNumero","ckBairro","ckComp"].forEach(id => document.getElementById(id).value = "");
         carregarClienteLocal();
         fecharModal("modalConta");
     }
@@ -635,9 +759,9 @@
 
     function abrirCheckout() {
         renderizarItensCheckout();
-        atualizarResumoCheckout();
         mudarPagamento();
         document.getElementById("modalCheckout").style.display = "flex";
+        calcularFreteAtual();
     }
 
     function renderizarItensCheckout() {
@@ -669,7 +793,7 @@
         document.getElementById("optRetirada").classList.toggle("ativo", tipo === "Retirada");
         document.getElementById("areaEndereco").style.display = tipo === "Entrega" ? "block" : "none";
         document.getElementById("areaRetiradaInfo").style.display = tipo === "Retirada" ? "block" : "none";
-        atualizarResumoCheckout();
+        calcularFreteAtual();
     }
 
     function mudarPagamento() {
@@ -684,46 +808,49 @@
         alert("Chave Pix copiada!");
     }
 
-    function calcularTotais() {
-        const subtotal = carrinho.reduce((acc, i) => acc + i.total_item, 0);
-        let taxa = 0;
-        if (tipoEntrega === "Entrega") {
-            const sel = document.getElementById("ckBairro");
-            const opt = sel.options[sel.selectedIndex];
-            taxa = opt ? parseFloat(opt.dataset.taxa) : 0;
-        }
-        return { subtotal, taxa, total: subtotal + taxa };
-    }
-
     function atualizarResumoCheckout() {
-        const t = calcularTotais();
-        document.getElementById("resSub").innerText = fmt(t.subtotal);
-        document.getElementById("resTaxa").innerText = tipoEntrega === "Retirada" ? "Grátis" : fmt(t.taxa);
-        document.getElementById("resTotal").innerText = fmt(t.total);
+        const subtotal = carrinho.reduce((acc, i) => acc + i.total_item, 0);
+        const taxa = tipoEntrega === "Retirada" ? 0 : taxaCalculada;
+        document.getElementById("resSub").innerText = fmt(subtotal);
+        document.getElementById("resTaxa").innerText = tipoEntrega === "Retirada" ? "Grátis" : fmt(taxa);
+        document.getElementById("resTotal").innerText = fmt(subtotal + taxa);
     }
 
     async function enviarPedido() {
         const nome = document.getElementById("ckNome").value.trim();
         const whats = document.getElementById("ckWhats").value.trim();
-        const endereco = document.getElementById("ckEndereco").value.trim();
+        const cep = document.getElementById("ckCep").value.trim();
+        const rua = document.getElementById("ckRua").value.trim();
+        const numero = document.getElementById("ckNumero").value.trim();
+        const bairro = document.getElementById("ckBairro").value.trim();
+        const comp = document.getElementById("ckComp").value.trim();
 
         if (!nome || !whats) return alert("Por favor, preencha seu nome e WhatsApp.");
-        if (tipoEntrega === "Entrega" && !endereco) return alert("Por favor, informe o endereço para entrega.");
+        if (tipoEntrega === "Entrega" && (!rua || !numero || !bairro)) {
+            return alert("Por favor, preencha Rua, Número e Bairro para entrega.");
+        }
 
-        const t = calcularTotais();
-        const bairro = tipoEntrega === "Entrega" ? document.getElementById("ckBairro").value : "Retirada no Balcão";
+        if (tipoEntrega === "Entrega" && taxaCalculada === 0) {
+            await calcularFreteAtual();
+        }
+
+        const subtotal = carrinho.reduce((acc, i) => acc + i.total_item, 0);
+        const taxa = tipoEntrega === "Retirada" ? 0 : taxaCalculada;
+        const enderecoFmt = tipoEntrega === "Entrega"
+            ? `${rua}, ${numero} - ${bairro}` + (comp ? ` (${comp})` : "")
+            : "Retirada no Balcão";
+
         const payload = {
-            cliente_nome: nome,
-            cliente_whatsapp: whats,
+            cliente_nome: nome, cliente_whatsapp: whats,
             tipo_entrega: tipoEntrega,
-            bairro: bairro,
-            endereco: tipoEntrega === "Entrega" ? endereco : "",
+            cep, rua, numero, bairro, complemento: comp,
+            endereco: enderecoFmt,
+            lat: gpsLat, lng: gpsLng,
+            link_maps: linkMapsCalculado,
+            distancia_km: distanciaCalculada,
             forma_pagamento: document.getElementById("ckPagamento").value,
             troco_para: document.getElementById("ckTroco").value.trim(),
-            itens: carrinho,
-            subtotal: t.subtotal,
-            taxa_entrega: t.taxa,
-            total: t.total
+            itens: carrinho, subtotal, taxa_entrega: taxa, total: subtotal + taxa
         };
 
         const r = await fetch("/api/pedidos", {
@@ -735,7 +862,7 @@
         if (res.sucesso) {
             ultimoPedido = res.pedido;
             localStorage.setItem("psiuburg_cliente", JSON.stringify({
-                nome, whatsapp: whats, bairro, endereco
+                nome, whatsapp: whats, cep, rua, numero, bairro, complemento: comp, lat: gpsLat, lng: gpsLng
             }));
             carregarClienteLocal();
             carrinho = [];
@@ -788,17 +915,13 @@
 
         let listaItens = p.itens.map(it => {
             let linha = `▪ *${it.qtd}x ${it.nome}* (${fmt(it.total_item)})`;
-            if (it.adicionais && it.adicionais.length) {
-                linha += `\n   + ${it.adicionais.map(a => a.nome).join(", ")}`;
-            }
-            if (it.obs) {
-                linha += `\n   _Obs: ${it.obs}_`;
-            }
+            if (it.adicionais && it.adicionais.length) linha += `\n   + ${it.adicionais.map(a => a.nome).join(", ")}`;
+            if (it.obs) linha += `\n   _Obs: ${it.obs}_`;
             return linha;
         }).join("\n");
 
         let blocoEntrega = p.tipo_entrega === "Entrega"
-            ? `🛵 *Entrega:* ${p.bairro}\n📍 *Endereço:* ${p.endereco}`
+            ? `🛵 *Entrega:* ${p.endereco}` + (p.link_maps ? `\n📍 *Localização:* ${p.link_maps}` : "")
             : `🏪 *Retirada no Balcão (Grátis)*`;
 
         let blocoTroco = p.troco_para ? `\n💵 *Troco para:* R$ ${p.troco_para}` : "";
