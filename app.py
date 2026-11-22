@@ -23,7 +23,7 @@ FUSO_HORARIO = timezone(timedelta(hours=-4))  # Horario de MT (UTC-4)
 # Coordenadas aproximadas da Av. Guarapuava, 1735 - Jardim Rondonia, Rondonopolis - MT
 LAT_LOJA = -16.4708
 LNG_LOJA = -54.6356
-TAXA_PADRAO_SE_NAO_LOCALIZAR = 8.00  # Taxa de seguranca caso o mapa nao ache a rua
+TAXA_PADRAO_SE_NAO_LOCALIZAR = 8.00
 
 # Banco de Dados Permanente (PostgreSQL no Neon)
 db_url = os.environ.get("DATABASE_URL", "sqlite:///psiuburg.db")
@@ -64,8 +64,8 @@ class Produto(db.Model):
 class FaixaEntrega(db.Model):
     __tablename__ = "faixas_entrega"
     id = db.Column(db.Integer, primary_key=True)
-    ate_km = db.Column(db.Float, nullable=False)  # Ex: 2.0 (Ate 2 km)
-    taxa = db.Column(db.Float, nullable=False)    # Ex: 5.00
+    ate_km = db.Column(db.Float, nullable=False)
+    taxa = db.Column(db.Float, nullable=False)
 
     def to_dict(self):
         return {"id": self.id, "ate_km": self.ate_km, "taxa": self.taxa}
@@ -75,6 +75,7 @@ class Cliente(db.Model):
     __tablename__ = "clientes"
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(150), nullable=False)
+    cpf = db.Column(db.String(20), default="")
     whatsapp = db.Column(db.String(30), unique=True, nullable=False)
     cep = db.Column(db.String(20), default="")
     rua = db.Column(db.String(200), default="")
@@ -88,7 +89,8 @@ class Cliente(db.Model):
 
     def to_dict(self):
         return {
-            "id": self.id, "nome": self.nome, "whatsapp": self.whatsapp,
+            "id": self.id, "nome": self.nome, "cpf": self.cpf or "",
+            "whatsapp": self.whatsapp,
             "cep": self.cep or "", "rua": self.rua or "", "numero": self.numero or "",
             "bairro": self.bairro or "", "complemento": self.complemento or "",
             "endereco": self.endereco or "", "lat": self.lat, "lng": self.lng
@@ -136,7 +138,6 @@ def limpar_telefone(fone):
 
 
 def calcular_distancia_km(lat1, lng1, lat2, lng2):
-    """Formula de Haversine + fator 1.25x para aproximar a distancia real de ruas."""
     R = 6371.0
     dlat = math.radians(lat2 - lat1)
     dlng = math.radians(lng2 - lng1)
@@ -146,7 +147,6 @@ def calcular_distancia_km(lat1, lng1, lat2, lng2):
 
 
 def geocodificar_endereco(rua, numero, bairro):
-    """Busca latitude e longitude gratuitas usando OpenStreetMap (Nominatim)."""
     try:
         consulta = f"{rua}, {numero}, {bairro}, Rondonópolis, MT, Brasil"
         url = "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode({
@@ -163,14 +163,12 @@ def geocodificar_endereco(rua, numero, bairro):
 
 
 def obter_taxa_por_km(distancia_km):
-    """Encontra a faixa de preco cadastrada no painel para aquela distancia."""
     faixas = FaixaEntrega.query.order_by(FaixaEntrega.ate_km.asc()).all()
     if not faixas:
         return TAXA_PADRAO_SE_NAO_LOCALIZAR
     for f in faixas:
         if distancia_km <= f.ate_km:
             return f.taxa
-    # Se passar da maior faixa cadastrada, cobra a maior faixa
     return faixas[-1].taxa
 
 
@@ -180,6 +178,7 @@ def init_db():
 
         # Garante que bancos ja existentes no Neon recebam as novas colunas sem perder dados
         colunas_novas = [
+            "ALTER TABLE clientes ADD COLUMN cpf VARCHAR(20) DEFAULT ''",
             "ALTER TABLE clientes ADD COLUMN cep VARCHAR(20) DEFAULT ''",
             "ALTER TABLE clientes ADD COLUMN rua VARCHAR(200) DEFAULT ''",
             "ALTER TABLE clientes ADD COLUMN numero VARCHAR(40) DEFAULT ''",
@@ -265,7 +264,6 @@ def api_dados():
 
 @app.route("/api/calcular-frete", methods=["POST"])
 def calcular_frete():
-    """Calcula a taxa automaticamente pela distancia (GPS ou Endereco)."""
     d = request.json or {}
     lat = d.get("lat")
     lng = d.get("lng")
@@ -287,7 +285,6 @@ def calcular_frete():
             "lat": lat, "lng": lng, "link_maps": link_maps
         })
 
-    # Se nao conseguiu coordenada exata, usa taxa padrao e gera link de busca no Maps
     q = urllib.parse.quote(f"{rua}, {numero} - {bairro}, Rondonópolis - MT")
     return jsonify({
         "sucesso": True, "distancia_km": 0.0, "taxa": TAXA_PADRAO_SE_NAO_LOCALIZAR,
@@ -319,6 +316,7 @@ def salvar_cliente():
     d = request.json or {}
     fone = limpar_telefone(d.get("whatsapp", ""))
     nome = d.get("nome", "").strip()
+    cpf = d.get("cpf", "").strip()
     if not fone or not nome:
         return jsonify({"sucesso": False, "erro": "Informe nome e WhatsApp."}), 400
 
@@ -337,6 +335,8 @@ def salvar_cliente():
 
     if cli:
         cli.nome = nome
+        if cpf:
+            cli.cpf = cpf
         cli.cep = cep
         cli.rua = rua
         cli.numero = numero
@@ -348,7 +348,7 @@ def salvar_cliente():
             cli.lng = float(lng)
     else:
         cli = Cliente(
-            nome=nome, whatsapp=fone, cep=cep, rua=rua, numero=numero,
+            nome=nome, cpf=cpf, whatsapp=fone, cep=cep, rua=rua, numero=numero,
             bairro=bairro, complemento=complemento, endereco=endereco_fmt,
             lat=float(lat) if lat is not None else None,
             lng=float(lng) if lng is not None else None,
@@ -372,7 +372,6 @@ def criar_pedido():
     forma_pag = dados.get("forma_pagamento", "Pix")
     status_pag = "Aguardando Pagamento" if forma_pag in ["Pix", "Cartão Online (Link)"] else "Pagar na Entrega"
 
-    # Salva ou atualiza o cadastro do cliente automaticamente
     if fone and nome:
         cli = Cliente.query.filter_by(whatsapp=fone).first()
         if cli:
@@ -389,7 +388,7 @@ def criar_pedido():
                     cli.lng = float(dados.get("lng"))
         else:
             db.session.add(Cliente(
-                nome=nome, whatsapp=fone,
+                nome=nome, cpf=dados.get("cpf", ""), whatsapp=fone,
                 cep=dados.get("cep", ""), rua=dados.get("rua", ""),
                 numero=dados.get("numero", ""), bairro=dados.get("bairro", ""),
                 complemento=dados.get("complemento", ""), endereco=dados.get("endereco", ""),
