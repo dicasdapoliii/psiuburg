@@ -15,25 +15,22 @@
         header {
             background: radial-gradient(circle at top, #292105 0%, #000000 75%);
             border-bottom: 3px solid var(--amarelo);
-            padding: 24px 16px 20px;
-            text-align: center;
+            padding: 22px 16px 18px; text-align: center;
         }
         .logo-destaque {
-            width: 185px;
-            height: 185px;
-            object-fit: contain;
-            border-radius: 50%;
-            background: #000;
-            box-shadow: 0 0 28px rgba(255, 193, 7, 0.45);
-            margin-bottom: 10px;
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
+            width: 185px; height: 185px; object-fit: contain; border-radius: 50%;
+            background: #000; box-shadow: 0 0 28px rgba(255, 193, 7, 0.45);
+            margin: 0 auto 10px; display: block;
         }
+        .topo-acoes { display: flex; justify-content: center; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
         .status-pill {
-            display: inline-block; background: rgba(40, 167, 69, 0.2); color: #4cd964;
-            padding: 5px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; margin-top: 4px;
+            background: rgba(40, 167, 69, 0.2); color: #4cd964;
+            padding: 5px 14px; border-radius: 20px; font-size: 13px; font-weight: bold;
             border: 1px solid rgba(76, 217, 100, 0.35);
+        }
+        .btn-conta {
+            background: #1f1f1f; color: var(--amarelo); border: 1px solid var(--amarelo);
+            padding: 5px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer;
         }
 
         .categorias {
@@ -120,13 +117,20 @@
             display: inline-block; padding: 6px 14px; border-radius: 20px;
             font-weight: bold; font-size: 13px; background: #2b2b2b; margin-bottom: 10px;
         }
+        .hist-card {
+            background: #121212; border: 1px solid #2c2c2c; border-radius: 10px;
+            padding: 10px; margin-top: 8px; font-size: 13px; text-align: left;
+        }
     </style>
 </head>
 <body>
 
 <header>
     <img src="/logo" alt="{{ nome_loja }}" class="logo-destaque">
-    <div class="status-pill">● Aberto para pedidos</div>
+    <div class="topo-acoes">
+        <div class="status-pill">● Aberto para pedidos</div>
+        <button class="btn-conta" id="btnMinhaConta" onclick="abrirCadastro()">👤 Meu Cadastro</button>
+    </div>
 </header>
 
 <div class="categorias" id="barraCategorias"></div>
@@ -136,6 +140,41 @@
     <span id="qtdCarrinho">0 itens</span>
     <span>Ver Carrinho →</span>
     <span id="totalCarrinho">R$ 0,00</span>
+</div>
+
+<!-- Modal Cadastro do Cliente -->
+<div class="modal-bg" id="modalCadastro">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h2 style="color: var(--amarelo);">👤 Meu Cadastro</h2>
+            <button class="btn-fechar" onclick="fecharModal('modalCadastro')">✕</button>
+        </div>
+        <p style="font-size:13px; color:var(--cinza); margin-bottom:10px;">
+            Salve seus dados para agilizar seus próximos pedidos e ver seu histórico!
+        </p>
+
+        <label>Seu WhatsApp (com DDD):</label>
+        <div style="display:flex; gap:8px;">
+            <input id="cadWhats" placeholder="Ex: 66999998888" type="tel">
+            <button class="btn-secundario" onclick="buscarCadastro()">Buscar</button>
+        </div>
+
+        <label>Seu Nome:</label>
+        <input id="cadNome" placeholder="Ex: Poliana">
+
+        <label>Bairro / Distância Padrão:</label>
+        <select id="cadBairro"></select>
+
+        <label>Endereço Completo:</label>
+        <input id="cadEndereco" placeholder="Rua, número, ponto de referência">
+
+        <button class="btn-principal" onclick="salvarCadastro()">💾 Salvar Meu Cadastro</button>
+
+        <div id="areaHistCliente" style="margin-top:18px; display:none;">
+            <h3 style="color:var(--amarelo); font-size:15px; margin-bottom:6px;">Seus Últimos Pedidos</h3>
+            <div id="listaHistCliente"></div>
+        </div>
+    </div>
 </div>
 
 <!-- Modal Produto -->
@@ -253,7 +292,7 @@
     let produtoSelecionado = null;
     let qtdSelecionada = 1;
     let tipoEntrega = "Entrega";
-    let ultimoPedidoId = null;
+    let ultimoPedido = null;
     let timerRastreio = null;
 
     const fmt = v => "R$ " + Number(v).toFixed(2).replace(".", ",");
@@ -263,13 +302,99 @@
         DADOS = await r.json();
         document.getElementById("textoChavePix").innerText = DADOS.chave_pix;
 
-        const selBairro = document.getElementById("ckBairro");
-        selBairro.innerHTML = DADOS.bairros.map(b =>
+        const opcoesBairro = DADOS.bairros.map(b =>
             `<option value="${b.nome}" data-taxa="${b.taxa}">${b.nome} (+ ${fmt(b.taxa)})</option>`
         ).join("");
+        document.getElementById("ckBairro").innerHTML = opcoesBairro;
+        document.getElementById("cadBairro").innerHTML = opcoesBairro;
 
+        carregarClienteLocal();
         renderizarCategorias();
         renderizarProdutos();
+    }
+
+    function carregarClienteLocal() {
+        const salvo = localStorage.getItem("psiuburg_cliente");
+        if (!salvo) return;
+        try {
+            const c = JSON.parse(salvo);
+            document.getElementById("ckNome").value = c.nome || "";
+            document.getElementById("ckWhats").value = c.whatsapp || "";
+            document.getElementById("ckEndereco").value = c.endereco || "";
+            if (c.bairro) document.getElementById("ckBairro").value = c.bairro;
+            if (c.nome) document.getElementById("btnMinhaConta").innerText = `👤 Olá, ${c.nome.split(" ")[0]}`;
+        } catch (e) {}
+    }
+
+    function abrirCadastro() {
+        const salvo = localStorage.getItem("psiuburg_cliente");
+        if (salvo) {
+            const c = JSON.parse(salvo);
+            document.getElementById("cadWhats").value = c.whatsapp || "";
+            document.getElementById("cadNome").value = c.nome || "";
+            document.getElementById("cadEndereco").value = c.endereco || "";
+            if (c.bairro) document.getElementById("cadBairro").value = c.bairro;
+            buscarCadastro(true);
+        }
+        document.getElementById("modalCadastro").style.display = "flex";
+    }
+
+    async function buscarCadastro(silencioso = false) {
+        const whats = document.getElementById("cadWhats").value.trim();
+        if (!whats) return;
+        const r = await fetch("/api/clientes/buscar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ whatsapp: whats })
+        });
+        const d = await r.json();
+        if (d.encontrado) {
+            document.getElementById("cadNome").value = d.cliente.nome || "";
+            document.getElementById("cadEndereco").value = d.cliente.endereco || "";
+            if (d.cliente.bairro) document.getElementById("cadBairro").value = d.cliente.bairro;
+            localStorage.setItem("psiuburg_cliente", JSON.stringify(d.cliente));
+            carregarClienteLocal();
+
+            if (d.pedidos && d.pedidos.length > 0) {
+                document.getElementById("areaHistCliente").style.display = "block";
+                document.getElementById("listaHistCliente").innerHTML = d.pedidos.map(p => `
+                    <div class="hist-card">
+                        <div style="display:flex; justify-content:space-between;">
+                            <strong>Pedido #${p.id} (${p.data_hora})</strong>
+                            <span style="color:var(--amarelo);">${p.status}</span>
+                        </div>
+                        <div style="color:var(--cinza); margin-top:4px;">
+                            ${p.itens.map(i => `${i.qtd}x ${i.nome}`).join(", ")} — <strong>${fmt(p.total)}</strong>
+                        </div>
+                    </div>
+                `).join("");
+            }
+        } else if (!silencioso) {
+            alert("Cadastro não encontrado. Preencha seus dados abaixo e clique em Salvar!");
+        }
+    }
+
+    async function salvarCadastro() {
+        const payload = {
+            whatsapp: document.getElementById("cadWhats").value.trim(),
+            nome: document.getElementById("cadNome").value.trim(),
+            bairro: document.getElementById("cadBairro").value,
+            endereco: document.getElementById("cadEndereco").value.trim()
+        };
+        if (!payload.nome || !payload.whatsapp) return alert("Preencha nome e WhatsApp!");
+
+        const r = await fetch("/api/clientes/salvar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const d = await r.json();
+        if (d.sucesso) {
+            localStorage.setItem("psiuburg_cliente", JSON.stringify(d.cliente));
+            carregarClienteLocal();
+            alert("Cadastro salvo com sucesso!");
+            fecharModal("modalCadastro");
+        }
     }
 
     function renderizarCategorias() {
@@ -437,11 +562,12 @@
         if (tipoEntrega === "Entrega" && !endereco) return alert("Por favor, informe o endereço para entrega.");
 
         const t = calcularTotais();
+        const bairro = tipoEntrega === "Entrega" ? document.getElementById("ckBairro").value : "Retirada no Balcão";
         const payload = {
             cliente_nome: nome,
             cliente_whatsapp: whats,
             tipo_entrega: tipoEntrega,
-            bairro: tipoEntrega === "Entrega" ? document.getElementById("ckBairro").value : "Retirada no Balcão",
+            bairro: bairro,
             endereco: tipoEntrega === "Entrega" ? endereco : "",
             forma_pagamento: document.getElementById("ckPagamento").value,
             troco_para: document.getElementById("ckTroco").value.trim(),
@@ -458,11 +584,15 @@
         });
         const res = await r.json();
         if (res.sucesso) {
-            ultimoPedidoId = res.pedido_id;
+            ultimoPedido = res.pedido;
+            localStorage.setItem("psiuburg_cliente", JSON.stringify({
+                nome, whatsapp: whats, bairro, endereco
+            }));
+            carregarClienteLocal();
             carrinho = [];
             atualizarBarraCarrinho();
             fecharModal("modalCheckout");
-            abrirRastreio(ultimoPedidoId);
+            abrirRastreio(ultimoPedido.id);
         }
     }
 
@@ -475,10 +605,11 @@
     }
 
     async function atualizarStatusAoVivo() {
-        if (!ultimoPedidoId) return;
-        const r = await fetch(`/api/pedidos/${ultimoPedidoId}`);
+        if (!ultimoPedido) return;
+        const r = await fetch(`/api/pedidos/${ultimoPedido.id}`);
         if (r.ok) {
             const p = await r.json();
+            ultimoPedido = p;
             document.getElementById("rasStatus").innerText = p.status;
 
             const badge = document.getElementById("rasPagStatus");
@@ -503,8 +634,42 @@
     }
 
     function abrirWhatsLoja() {
-        const msg = encodeURIComponent(`Olá ${DADOS.loja}! Acabei de fazer o pedido #${ultimoPedidoId} pelo cardápio digital.`);
-        window.open(`https://wa.me/${DADOS.whatsapp}?text=${msg}`, "_blank");
+        if (!ultimoPedido) return;
+        const p = ultimoPedido;
+
+        let listaItens = p.itens.map(it => {
+            let linha = `▪ *${it.qtd}x ${it.nome}* (${fmt(it.total_item)})`;
+            if (it.adicionais && it.adicionais.length) {
+                linha += `\n   + ${it.adicionais.map(a => a.nome).join(", ")}`;
+            }
+            if (it.obs) {
+                linha += `\n   _Obs: ${it.obs}_`;
+            }
+            return linha;
+        }).join("\n");
+
+        let blocoEntrega = p.tipo_entrega === "Entrega"
+            ? `🛵 *Entrega:* ${p.bairro}\n📍 *Endereço:* ${p.endereco}`
+            : `🏪 *Retirada no Balcão (Grátis)*`;
+
+        let blocoTroco = p.troco_para ? `\n💵 *Troco para:* R$ ${p.troco_para}` : "";
+
+        const texto =
+`🍔 *NOVO PEDIDO #${p.id} — ${DADOS.loja}*
+
+👤 *Cliente:* ${p.cliente_nome}
+${blocoEntrega}
+
+📋 *ITENS DO PEDIDO:*
+${listaItens}
+
+Subtotal: ${fmt(p.subtotal)}
+Taxa de entrega: ${p.taxa_entrega > 0 ? fmt(p.taxa_entrega) : "Grátis"}
+💰 *TOTAL: ${fmt(p.total)}*
+
+💳 *Pagamento:* ${p.forma_pagamento}${blocoTroco}`;
+
+        window.open(`https://wa.me/${DADOS.whatsapp}?text=${encodeURIComponent(texto)}`, "_blank");
     }
 
     function fecharModal(id) { document.getElementById(id).style.display = "none"; }
