@@ -15,32 +15,38 @@
         }
         .topo h1 { color: var(--amarelo); font-size: 22px; }
         .botoes-topo { display: flex; gap: 8px; flex-wrap: wrap; }
-        button { cursor: pointer; border: none; border-radius: 8px; padding: 9px 14px; font-weight: bold; font-size: 13px; }
+        button { cursor: pointer; border: none; border-radius: 8px; padding: 9px 12px; font-weight: bold; font-size: 13px; }
         .btn-amarelo { background: var(--amarelo); color: #000; }
         .btn-verde { background: var(--verde); color: #fff; }
+        .btn-ton { background: #00a868; color: #fff; }
         .btn-azul { background: var(--azul); color: #fff; }
         .btn-cinza { background: #333; color: #fff; }
         .btn-vermelho { background: var(--vermelho); color: #fff; }
 
-        .abas { display: flex; gap: 10px; margin-bottom: 18px; }
+        .abas { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
         .aba-btn { background: #262626; color: #ccc; padding: 10px 18px; border-radius: 8px; }
         .aba-btn.ativa { background: var(--amarelo); color: #000; }
 
-        .grid-pedidos { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
+        .grid-pedidos { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
         .card-pedido {
             background: var(--card); border: 1px solid #333; border-radius: 12px; padding: 14px;
             border-left: 5px solid var(--amarelo);
         }
-        .card-pedido.status-Concluído { opacity: 0.6; border-left-color: #666; }
+        .card-pedido.status-Concluído { opacity: 0.65; border-left-color: #666; }
+        .card-pedido.status-Cancelado { opacity: 0.5; border-left-color: var(--vermelho); }
         .card-pedido.status-NaChapa { border-left-color: var(--azul); }
-        .card-pedido.status-Saiu { border-left-color: var(--verde); }
+        .card-pedido.status-SaiuparaEntrega { border-left-color: var(--verde); }
 
         .cab-pedido { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 15px; }
         .badge { padding: 3px 9px; border-radius: 12px; font-size: 12px; background: #333; color: var(--amarelo); }
+        .badge-pago { background: #144d25; color: #4cd964; padding: 3px 8px; border-radius: 8px; font-size: 12px; font-weight: bold; }
+        .badge-aguardando { background: #4a3500; color: #ffc107; padding: 3px 8px; border-radius: 8px; font-size: 12px; font-weight: bold; }
+        .badge-entrega { background: #2b2b2b; color: #ccc; padding: 3px 8px; border-radius: 8px; font-size: 12px; }
+
         .itens-lista { background: #141414; padding: 10px; border-radius: 8px; margin: 10px 0; font-size: 13px; }
         .acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 
-        .painel-form { background: var(--card); padding: 16px; border-radius: 12px; margin-bottom: 18px; max-width: 700px; }
+        .painel-form { background: var(--card); padding: 16px; border-radius: 12px; margin-bottom: 18px; max-width: 750px; }
         .painel-form input, .painel-form select {
             width: 100%; padding: 10px; margin: 6px 0 10px; background: #111; border: 1px solid #333; color: #fff; border-radius: 8px;
         }
@@ -48,6 +54,15 @@
             display: flex; justify-content: space-between; align-items: center;
             padding: 10px; background: #181818; border-radius: 8px; margin-bottom: 6px;
         }
+
+        /* Fluxo de Caixa */
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 14px 0 20px; }
+        .kpi-card { background: var(--card); border: 1px solid #333; border-radius: 12px; padding: 16px; }
+        .kpi-card small { color: #aaa; font-size: 12px; }
+        .kpi-valor { font-size: 24px; font-weight: 900; margin-top: 6px; }
+        table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; font-size: 13px; }
+        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #2b2b2b; }
+        th { background: #252525; color: var(--amarelo); }
     </style>
 </head>
 <body>
@@ -63,6 +78,7 @@
 
 <div class="abas">
     <button class="aba-btn ativa" id="tabPedidosBtn" onclick="trocarAba('pedidos')">📋 Pedidos ao Vivo</button>
+    <button class="aba-btn" id="tabFinanceiroBtn" onclick="trocarAba('financeiro')">💰 Fluxo de Caixa</button>
     <button class="aba-btn" id="tabGestaoBtn" onclick="trocarAba('gestao')">⚙️ Cardápio & Taxas</button>
 </div>
 
@@ -71,7 +87,56 @@
     <div class="grid-pedidos" id="listaPedidos">Carregando pedidos...</div>
 </div>
 
-<!-- ABA 2: GERENCIAR CARDÁPIO E TAXAS -->
+<!-- ABA 2: FLUXO DE CAIXA E HISTORICO MENSAL -->
+<div id="abaFinanceiro" style="display:none;">
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <label style="font-weight:bold;">Filtrar Mês:</label>
+        <input type="month" id="filtroMes" onchange="carregarFinanceiro()" style="background:#1e1e1e; color:#fff; border:1px solid #444; padding:8px 12px; border-radius:8px;">
+        <button class="btn-amarelo" onclick="carregarFinanceiro()">Atualizar Relatório</button>
+    </div>
+
+    <div class="kpi-grid">
+        <div class="kpi-card" style="border-top:4px solid var(--verde);">
+            <small>✅ VENDAS PAGAS (ENTROU NO CAIXA)</small>
+            <div class="kpi-valor" style="color:#4cd964;" id="kpiPago">R$ 0,00</div>
+            <small id="kpiQtdPago">0 pedidos</small>
+        </div>
+        <div class="kpi-card" style="border-top:4px solid var(--amarelo);">
+            <small>⏳ NÃO PAGOS / A RECEBER</small>
+            <div class="kpi-valor" style="color:var(--amarelo);" id="kpiNaoPago">R$ 0,00</div>
+            <small id="kpiQtdNaoPago">0 pedidos</small>
+        </div>
+        <div class="kpi-card" style="border-top:4px solid var(--vermelho);">
+            <small>❌ PEDIDOS CANCELADOS</small>
+            <div class="kpi-valor" style="color:#ff5252;" id="kpiCancelado">R$ 0,00</div>
+            <small id="kpiQtdCancelado">0 pedidos</small>
+        </div>
+    </div>
+
+    <div class="painel-form" style="max-width:100%;">
+        <h3 style="color:var(--amarelo); margin-bottom:10px;">Entradas Pagas por Forma de Pagamento</h3>
+        <div id="resumoFormas" style="display:flex; gap:12px; flex-wrap:wrap; font-size:14px;"></div>
+    </div>
+
+    <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Data/Hora</th>
+                    <th>Cliente</th>
+                    <th>Pagamento</th>
+                    <th>Status Pag.</th>
+                    <th>Status Pedido</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody id="tabelaHistorico"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ABA 3: CARDAPIO E TAXAS -->
 <div id="abaGestao" style="display:none;">
     <div class="painel-form">
         <h3 style="color:var(--amarelo); margin-bottom:10px;">+ Novo Produto no Cardápio</h3>
@@ -109,6 +174,10 @@
 
     const fmt = v => "R$ " + Number(v).toFixed(2).replace(".", ",");
 
+    // Define o mes atual no filtro do fluxo de caixa
+    const hoje = new Date();
+    document.getElementById("filtroMes").value = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
+
     function ativarSom() {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         somAtivo = true;
@@ -135,10 +204,21 @@
 
     function trocarAba(aba) {
         document.getElementById("abaPedidos").style.display = aba === "pedidos" ? "block" : "none";
+        document.getElementById("abaFinanceiro").style.display = aba === "financeiro" ? "block" : "none";
         document.getElementById("abaGestao").style.display = aba === "gestao" ? "block" : "none";
+
         document.getElementById("tabPedidosBtn").classList.toggle("ativa", aba === "pedidos");
+        document.getElementById("tabFinanceiroBtn").classList.toggle("ativa", aba === "financeiro");
         document.getElementById("tabGestaoBtn").classList.toggle("ativa", aba === "gestao");
+
+        if (aba === "financeiro") carregarFinanceiro();
         if (aba === "gestao") carregarGestao();
+    }
+
+    function renderBadgePagamento(statusPag) {
+        if (statusPag === "Pago") return `<span class="badge-pago">✅ PAGO</span>`;
+        if (statusPag === "Aguardando Pagamento") return `<span class="badge-aguardando">⏳ Aguardando Pagamento</span>`;
+        return `<span class="badge-entrega">🛵 ${statusPag}</span>`;
     }
 
     async function carregarPedidos() {
@@ -147,15 +227,13 @@
 
         if (pedidos.length > 0) {
             const maiorId = pedidos[0].id;
-            if (!primeiraCarga && maiorId > ultimoIdVisto) {
-                tocarCampainha();
-            }
+            if (!primeiraCarga && maiorId > ultimoIdVisto) tocarCampainha();
             ultimoIdVisto = maiorId;
         }
         primeiraCarga = false;
 
         if (pedidos.length === 0) {
-            document.getElementById("listaPedidos").innerHTML = "<p style='color:#888;'>Nenhum pedido recebido ainda. Faça um teste no cardápio!</p>";
+            document.getElementById("listaPedidos").innerHTML = "<p style='color:#888;'>Nenhum pedido recebido ainda.</p>";
             return;
         }
 
@@ -167,8 +245,11 @@
                     <strong>Pedido #${p.id} • ${p.data_hora.split(' ')[1]}</strong>
                     <span class="badge">${p.status}</span>
                 </div>
-                <div><strong>${p.cliente_nome}</strong> (${p.cliente_whatsapp})</div>
-                <div style="font-size:13px; color:#ccc; margin-top:4px;">
+                <div style="margin-bottom:6px;">
+                    <strong>${p.cliente_nome}</strong> (${p.cliente_whatsapp})
+                    <div style="margin-top:4px;">${renderBadgePagamento(p.status_pagamento)}</div>
+                </div>
+                <div style="font-size:13px; color:#ccc;">
                     ${p.tipo_entrega === 'Entrega' ? `🛵 <strong>${p.bairro}</strong> — ${p.endereco}` : '🏪 <strong>Retirada no Balcão (Grátis)</strong>'}
                 </div>
 
@@ -189,18 +270,88 @@
 
                 <div class="acoes">
                     <button class="btn-amarelo" onclick="imprimir80mm(${p.id})">🖨️ Imprimir 80mm</button>
-                    ${p.status === 'Recebido' ? `<button class="btn-azul" onclick="mudarStatus(${p.id}, 'Na Chapa')">🔥 Aceitar (Na Chapa)</button>` : ''}
-                    ${p.status === 'Na Chapa' ? `<button class="btn-verde" onclick="mudarStatus(${p.id}, 'Saiu para Entrega')">🛵 Saiu p/ Entrega</button>` : ''}
-                    ${p.status !== 'Concluído' ? `<button class="btn-cinza" onclick="mudarStatus(${p.id}, 'Concluído')">✅ Concluir</button>` : ''}
+
+                    ${p.status !== 'Cancelado' && p.status_pagamento !== 'Pago' ? `
+                        ${p.forma_pagamento.includes('Link') ? `<button class="btn-ton" onclick="enviarLinkTon(${p.id}, '${p.cliente_whatsapp}', ${p.total})">🔗 Link Ton</button>` : ''}
+                        <button class="btn-verde" onclick="confirmarPago(${p.id})">✅ Confirmar Pago</button>
+                    ` : ''}
+
+                    ${p.status === 'Recebido' ? `<button class="btn-azul" onclick="mudarStatus(${p.id}, 'Na Chapa')">🔥 Na Chapa</button>` : ''}
+                    ${p.status === 'Na Chapa' ? `<button class="btn-verde" onclick="mudarStatus(${p.id}, 'Saiu para Entrega')">🛵 Saiu</button>` : ''}
+                    ${p.status !== 'Concluído' && p.status !== 'Cancelado' ? `<button class="btn-cinza" onclick="mudarStatus(${p.id}, 'Concluído')">✔ Concluir</button>` : ''}
+                    ${p.status !== 'Cancelado' ? `<button class="btn-vermelho" onclick="cancelarPedido(${p.id})">❌ Cancelar</button>` : ''}
                     <button class="btn-cinza" style="background:#128C7E;" onclick="avisarWhats('${p.cliente_whatsapp}', ${p.id}, '${p.status}')">💬 Whats</button>
                 </div>
             </div>`;
         }).join("");
     }
 
-    function imprimir80mm(id) {
-        window.open(`/imprimir/${id}`, "Impressao80mm", "width=340,height=600");
+    async function carregarFinanceiro() {
+        const mes = document.getElementById("filtroMes").value;
+        const r = await fetch(`/api/admin/financeiro?mes=${mes}`);
+        const d = await r.json();
+
+        document.getElementById("kpiPago").innerText = fmt(d.total_pago);
+        document.getElementById("kpiQtdPago").innerText = `${d.qtd_pago} pedidos pagos`;
+
+        document.getElementById("kpiNaoPago").innerText = fmt(d.total_nao_pago);
+        document.getElementById("kpiQtdNaoPago").innerText = `${d.qtd_nao_pago} pedidos pendentes`;
+
+        document.getElementById("kpiCancelado").innerText = fmt(d.total_cancelado);
+        document.getElementById("kpiQtdCancelado").innerText = `${d.qtd_cancelado} cancelados`;
+
+        const formas = Object.entries(d.por_forma_pagamento);
+        document.getElementById("resumoFormas").innerHTML = formas.length
+            ? formas.map(([f, v]) => `<div style="background:#141414; padding:8px 14px; border-radius:8px; border:1px solid #333;"><strong>${f}:</strong> <span style="color:#4cd964;">${fmt(v)}</span></div>`).join("")
+            : "<span style='color:#888;'>Nenhuma venda paga registrada neste mês ainda.</span>";
+
+        document.getElementById("tabelaHistorico").innerHTML = d.pedidos.length
+            ? d.pedidos.map(p => `
+                <tr>
+                    <td>#${p.id}</td>
+                    <td>${p.data_hora}</td>
+                    <td>${p.cliente_nome}</td>
+                    <td>${p.forma_pagamento}</td>
+                    <td>${renderBadgePagamento(p.status_pagamento)}</td>
+                    <td>${p.status}</td>
+                    <td><strong>${fmt(p.total)}</strong></td>
+                </tr>
+            `).join("")
+            : `<tr><td colspan="7" style="text-align:center; color:#888;">Nenhum pedido encontrado em ${mes}.</td></tr>`;
     }
+
+    async function enviarLinkTon(id, fone, total) {
+        const link = prompt(`Cole aqui o Link de Pagamento gerado no app da Ton (Valor: ${fmt(total)}):`);
+        if (!link || !link.trim()) return;
+
+        await fetch(`/api/admin/pedidos/${id}/pagamento`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ link_pagamento: link.trim() })
+        });
+        carregarPedidos();
+
+        const limpo = fone.replace(/\D/g, "");
+        const num = limpo.startsWith("55") ? limpo : "55" + limpo;
+        const msg = encodeURIComponent(`Olá! Segue o link seguro para pagamento do seu pedido #${id} (${fmt(total)}) na PSIU! BURG 🍔:\n\n${link.trim()}`);
+        window.open(`https://wa.me/${num}?text=${msg}`, "_blank");
+    }
+
+    async function confirmarPago(id) {
+        await fetch(`/api/admin/pedidos/${id}/pagamento`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status_pagamento: "Pago" })
+        });
+        carregarPedidos();
+    }
+
+    async function cancelarPedido(id) {
+        if (!confirm(`Tem certeza que deseja cancelar o Pedido #${id}?`)) return;
+        await mudarStatus(id, "Cancelado");
+    }
+
+    function imprimir80mm(id) { window.open(`/imprimir/${id}`, "Impressao80mm", "width=340,height=600"); }
 
     async function mudarStatus(id, status) {
         await fetch(`/api/admin/pedidos/${id}/status`, {
@@ -248,10 +399,8 @@
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                nome,
-                categoria: document.getElementById("pCat").value,
-                descricao: document.getElementById("pDesc").value.trim(),
-                preco
+                nome, categoria: document.getElementById("pCat").value,
+                descricao: document.getElementById("pDesc").value.trim(), preco
             })
         });
         document.getElementById("pNome").value = "";
@@ -277,7 +426,7 @@
         carregarGestao();
     }
 
-    async function delBairro(id) { await fetch(`/api/admin/bairros/${id}`, { method: "DELETE" }); carregarGestao(); }
+    async function delBairro(id) { if (confirm("Excluir taxa?")) { await fetch(`/api/admin/bairros/${id}`, { method: "DELETE" }); carregarGestao(); } }
 
     carregarPedidos();
     setInterval(carregarPedidos, 5000);
