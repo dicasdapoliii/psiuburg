@@ -90,6 +90,13 @@
             background: #2b2b2b; color: #fff; border: 1px solid #444;
             padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 13px;
         }
+        .link-troca {
+            text-align: center; margin-top: 14px; font-size: 14px; color: var(--cinza);
+        }
+        .link-troca a {
+            color: var(--amarelo); font-weight: bold; text-decoration: underline; cursor: pointer;
+        }
+
         .qtd-box { display: flex; align-items: center; gap: 14px; margin-top: 12px; }
         .qtd-btn { width: 36px; height: 36px; border-radius: 8px; border: none; background: #333; color: #fff; font-size: 18px; cursor: pointer; }
 
@@ -129,7 +136,7 @@
     <img src="/logo" alt="{{ nome_loja }}" class="logo-destaque">
     <div class="topo-acoes">
         <div class="status-pill">● Aberto para pedidos</div>
-        <button class="btn-conta" id="btnMinhaConta" onclick="abrirCadastro()">👤 Meu Cadastro</button>
+        <button class="btn-conta" id="btnMinhaConta" onclick="abrirModalConta()">👤 Fazer Login</button>
     </div>
 </header>
 
@@ -142,37 +149,75 @@
     <span id="totalCarrinho">R$ 0,00</span>
 </div>
 
-<!-- Modal Cadastro do Cliente -->
-<div class="modal-bg" id="modalCadastro">
+<!-- Modal Login / Cadastro / Minha Conta -->
+<div class="modal-bg" id="modalConta">
     <div class="modal-box">
         <div class="modal-header">
-            <h2 style="color: var(--amarelo);">👤 Meu Cadastro</h2>
-            <button class="btn-fechar" onclick="fecharModal('modalCadastro')">✕</button>
+            <h2 id="tituloModalConta" style="color: var(--amarelo);">👤 Fazer Login</h2>
+            <button class="btn-fechar" onclick="fecharModal('modalConta')">✕</button>
         </div>
-        <p style="font-size:13px; color:var(--cinza); margin-bottom:10px;">
-            Salve seus dados para agilizar seus próximos pedidos e ver seu histórico!
-        </p>
 
-        <label>Seu WhatsApp (com DDD):</label>
-        <div style="display:flex; gap:8px;">
+        <!-- TELA 1: LOGIN -->
+        <div id="telaLogin">
+            <p style="font-size:13px; color:var(--cinza); margin-bottom:12px;">
+                Digite seu WhatsApp para entrar e puxar seu endereço e histórico de pedidos.
+            </p>
+            <label>Seu WhatsApp (com DDD):</label>
+            <input id="loginWhats" placeholder="Ex: 66999998888" type="tel">
+            <button class="btn-principal" onclick="fazerLogin()">Entrar</button>
+
+            <div class="link-troca">
+                Ainda não possui cadastro? <a onclick="mostrarTelaConta('cadastro')">Cadastre-se aqui</a>
+            </div>
+        </div>
+
+        <!-- TELA 2: CADASTRO -->
+        <div id="telaCadastro" style="display:none;">
+            <p style="font-size:13px; color:var(--cinza); margin-bottom:10px;">
+                Preencha uma única vez para agilizar seus próximos pedidos!
+            </p>
+            <label>Seu Nome:</label>
+            <input id="cadNome" placeholder="Ex: Poliana">
+
+            <label>Seu WhatsApp (com DDD):</label>
             <input id="cadWhats" placeholder="Ex: 66999998888" type="tel">
-            <button class="btn-secundario" onclick="buscarCadastro()">Buscar</button>
+
+            <label>Bairro / Distância Padrão:</label>
+            <select id="cadBairro"></select>
+
+            <label>Endereço Completo:</label>
+            <input id="cadEndereco" placeholder="Rua, número, ponto de referência">
+
+            <button class="btn-principal" onclick="salvarCadastro()">✅ Criar meu cadastro</button>
+
+            <div class="link-troca">
+                Já possui cadastro? <a onclick="mostrarTelaConta('login')">Fazer login</a>
+            </div>
         </div>
 
-        <label>Seu Nome:</label>
-        <input id="cadNome" placeholder="Ex: Poliana">
+        <!-- TELA 3: LOGADO (PERFIL + HISTÓRICO) -->
+        <div id="telaPerfil" style="display:none;">
+            <label>Seu Nome:</label>
+            <input id="perfNome">
 
-        <label>Bairro / Distância Padrão:</label>
-        <select id="cadBairro"></select>
+            <label>Seu WhatsApp:</label>
+            <input id="perfWhats" readonly style="opacity:0.7;">
 
-        <label>Endereço Completo:</label>
-        <input id="cadEndereco" placeholder="Rua, número, ponto de referência">
+            <label>Bairro / Distância Padrão:</label>
+            <select id="perfBairro"></select>
 
-        <button class="btn-principal" onclick="salvarCadastro()">💾 Salvar Meu Cadastro</button>
+            <label>Endereço Completo:</label>
+            <input id="perfEndereco">
 
-        <div id="areaHistCliente" style="margin-top:18px; display:none;">
-            <h3 style="color:var(--amarelo); font-size:15px; margin-bottom:6px;">Seus Últimos Pedidos</h3>
-            <div id="listaHistCliente"></div>
+            <div style="display:flex; gap:8px; margin-top:14px;">
+                <button class="btn-principal" style="margin-top:0;" onclick="atualizarPerfil()">💾 Salvar Alterações</button>
+                <button class="btn-secundario" style="color:#ff5252; border-color:#ff5252;" onclick="sairConta()">Sair</button>
+            </div>
+
+            <div id="areaHistCliente" style="margin-top:20px;">
+                <h3 style="color:var(--amarelo); font-size:15px; margin-bottom:6px;">📋 Seus Últimos Pedidos</h3>
+                <div id="listaHistCliente"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -307,71 +352,117 @@
         ).join("");
         document.getElementById("ckBairro").innerHTML = opcoesBairro;
         document.getElementById("cadBairro").innerHTML = opcoesBairro;
+        document.getElementById("perfBairro").innerHTML = opcoesBairro;
 
         carregarClienteLocal();
         renderizarCategorias();
         renderizarProdutos();
     }
 
-    function carregarClienteLocal() {
-        const salvo = localStorage.getItem("psiuburg_cliente");
-        if (!salvo) return;
+    function obterClienteSalvo() {
         try {
-            const c = JSON.parse(salvo);
-            document.getElementById("ckNome").value = c.nome || "";
-            document.getElementById("ckWhats").value = c.whatsapp || "";
-            document.getElementById("ckEndereco").value = c.endereco || "";
-            if (c.bairro) document.getElementById("ckBairro").value = c.bairro;
-            if (c.nome) document.getElementById("btnMinhaConta").innerText = `👤 Olá, ${c.nome.split(" ")[0]}`;
-        } catch (e) {}
+            const salvo = localStorage.getItem("psiuburg_cliente");
+            return salvo ? JSON.parse(salvo) : null;
+        } catch (e) { return null; }
     }
 
-    function abrirCadastro() {
-        const salvo = localStorage.getItem("psiuburg_cliente");
-        if (salvo) {
-            const c = JSON.parse(salvo);
-            document.getElementById("cadWhats").value = c.whatsapp || "";
-            document.getElementById("cadNome").value = c.nome || "";
-            document.getElementById("cadEndereco").value = c.endereco || "";
-            if (c.bairro) document.getElementById("cadBairro").value = c.bairro;
-            buscarCadastro(true);
+    function carregarClienteLocal() {
+        const c = obterClienteSalvo();
+        if (!c) {
+            document.getElementById("btnMinhaConta").innerText = "👤 Fazer Login";
+            return;
         }
-        document.getElementById("modalCadastro").style.display = "flex";
+        document.getElementById("ckNome").value = c.nome || "";
+        document.getElementById("ckWhats").value = c.whatsapp || "";
+        document.getElementById("ckEndereco").value = c.endereco || "";
+        if (c.bairro) document.getElementById("ckBairro").value = c.bairro;
+        if (c.nome) document.getElementById("btnMinhaConta").innerText = `👤 Olá, ${c.nome.split(" ")[0]}`;
     }
 
-    async function buscarCadastro(silencioso = false) {
-        const whats = document.getElementById("cadWhats").value.trim();
-        if (!whats) return;
+    function mostrarTelaConta(tela) {
+        document.getElementById("telaLogin").style.display = tela === "login" ? "block" : "none";
+        document.getElementById("telaCadastro").style.display = tela === "cadastro" ? "block" : "none";
+        document.getElementById("telaPerfil").style.display = tela === "perfil" ? "block" : "none";
+
+        const titulos = {
+            login: "👤 Fazer Login",
+            cadastro: "📝 Criar Cadastro",
+            perfil: "👤 Minha Conta"
+        };
+        document.getElementById("tituloModalConta").innerText = titulos[tela];
+    }
+
+    function abrirModalConta() {
+        const c = obterClienteSalvo();
+        if (c && c.whatsapp) {
+            preencherTelaPerfil(c);
+            mostrarTelaConta("perfil");
+            carregarHistoricoCliente(c.whatsapp);
+        } else {
+            document.getElementById("loginWhats").value = "";
+            mostrarTelaConta("login");
+        }
+        document.getElementById("modalConta").style.display = "flex";
+    }
+
+    function preencherTelaPerfil(c) {
+        document.getElementById("perfNome").value = c.nome || "";
+        document.getElementById("perfWhats").value = c.whatsapp || "";
+        document.getElementById("perfEndereco").value = c.endereco || "";
+        if (c.bairro) document.getElementById("perfBairro").value = c.bairro;
+    }
+
+    async function fazerLogin() {
+        const whats = document.getElementById("loginWhats").value.trim();
+        if (!whats) return alert("Digite seu WhatsApp para entrar!");
+
         const r = await fetch("/api/clientes/buscar", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ whatsapp: whats })
         });
         const d = await r.json();
+
         if (d.encontrado) {
-            document.getElementById("cadNome").value = d.cliente.nome || "";
-            document.getElementById("cadEndereco").value = d.cliente.endereco || "";
-            if (d.cliente.bairro) document.getElementById("cadBairro").value = d.cliente.bairro;
             localStorage.setItem("psiuburg_cliente", JSON.stringify(d.cliente));
             carregarClienteLocal();
-
-            if (d.pedidos && d.pedidos.length > 0) {
-                document.getElementById("areaHistCliente").style.display = "block";
-                document.getElementById("listaHistCliente").innerHTML = d.pedidos.map(p => `
-                    <div class="hist-card">
-                        <div style="display:flex; justify-content:space-between;">
-                            <strong>Pedido #${p.id} (${p.data_hora})</strong>
-                            <span style="color:var(--amarelo);">${p.status}</span>
-                        </div>
-                        <div style="color:var(--cinza); margin-top:4px;">
-                            ${p.itens.map(i => `${i.qtd}x ${i.nome}`).join(", ")} — <strong>${fmt(p.total)}</strong>
-                        </div>
-                    </div>
-                `).join("");
-            }
-        } else if (!silencioso) {
-            alert("Cadastro não encontrado. Preencha seus dados abaixo e clique em Salvar!");
+            preencherTelaPerfil(d.cliente);
+            renderizarHistorico(d.pedidos);
+            mostrarTelaConta("perfil");
+        } else {
+            alert("Ainda não encontramos um cadastro com esse número. Vamos criar o seu agora!");
+            document.getElementById("cadWhats").value = whats;
+            mostrarTelaConta("cadastro");
         }
+    }
+
+    async function carregarHistoricoCliente(whats) {
+        const r = await fetch("/api/clientes/buscar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ whatsapp: whats })
+        });
+        const d = await r.json();
+        renderizarHistorico(d.encontrado ? d.pedidos : []);
+    }
+
+    function renderizarHistorico(pedidos) {
+        const div = document.getElementById("listaHistCliente");
+        if (!pedidos || pedidos.length === 0) {
+            div.innerHTML = "<p style='color:var(--cinza); font-size:13px;'>Você ainda não fez pedidos por aqui.</p>";
+            return;
+        }
+        div.innerHTML = pedidos.map(p => `
+            <div class="hist-card">
+                <div style="display:flex; justify-content:space-between;">
+                    <strong>Pedido #${p.id} (${p.data_hora})</strong>
+                    <span style="color:var(--amarelo);">${p.status}</span>
+                </div>
+                <div style="color:var(--cinza); margin-top:4px;">
+                    ${p.itens.map(i => `${i.qtd}x ${i.nome}`).join(", ")} — <strong>${fmt(p.total)}</strong>
+                </div>
+            </div>
+        `).join("");
     }
 
     async function salvarCadastro() {
@@ -381,7 +472,7 @@
             bairro: document.getElementById("cadBairro").value,
             endereco: document.getElementById("cadEndereco").value.trim()
         };
-        if (!payload.nome || !payload.whatsapp) return alert("Preencha nome e WhatsApp!");
+        if (!payload.nome || !payload.whatsapp) return alert("Preencha seu nome e WhatsApp!");
 
         const r = await fetch("/api/clientes/salvar", {
             method: "POST",
@@ -392,9 +483,38 @@
         if (d.sucesso) {
             localStorage.setItem("psiuburg_cliente", JSON.stringify(d.cliente));
             carregarClienteLocal();
-            alert("Cadastro salvo com sucesso!");
-            fecharModal("modalCadastro");
+            alert("Cadastro criado com sucesso! Bem-vindo(a) à PSIU! BURG!");
+            fecharModal("modalConta");
         }
+    }
+
+    async function atualizarPerfil() {
+        const payload = {
+            whatsapp: document.getElementById("perfWhats").value.trim(),
+            nome: document.getElementById("perfNome").value.trim(),
+            bairro: document.getElementById("perfBairro").value,
+            endereco: document.getElementById("perfEndereco").value.trim()
+        };
+        const r = await fetch("/api/clientes/salvar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        const d = await r.json();
+        if (d.sucesso) {
+            localStorage.setItem("psiuburg_cliente", JSON.stringify(d.cliente));
+            carregarClienteLocal();
+            alert("Dados atualizados com sucesso!");
+        }
+    }
+
+    function sairConta() {
+        localStorage.removeItem("psiuburg_cliente");
+        document.getElementById("ckNome").value = "";
+        document.getElementById("ckWhats").value = "";
+        document.getElementById("ckEndereco").value = "";
+        carregarClienteLocal();
+        fecharModal("modalConta");
     }
 
     function renderizarCategorias() {
