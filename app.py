@@ -11,8 +11,8 @@ app = Flask(__name__)
 # 1. CONFIGURAÇÕES DA LANCHONETE (EDITE AQUI)
 # ==========================================
 NOME_LOJA = "PSIU! BURG"
-WHATSAPP_LOJA = "5565999999999"  # Coloque 55 + DDD + Numero (so numeros)
-CHAVE_PIX = "psiuburg@pix.com.br"  # Coloque a chave Pix real aqui
+WHATSAPP_LOJA = "5565999999999"   # 55 + DDD + Numero (so numeros)
+CHAVE_PIX = "psiuburg@pix.com.br" # Chave Pix real da lanchonete
 FUSO_HORARIO = timezone(timedelta(hours=-4))  # Horario de MT (UTC-4)
 
 DB_PATH = "psiuburg.db"
@@ -38,7 +38,6 @@ def init_db():
     conn = conectar_db()
     cur = conn.cursor()
 
-    # Tabela de Produtos
     cur.execute("""
         CREATE TABLE IF NOT EXISTS produtos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,7 +49,6 @@ def init_db():
         )
     """)
 
-    # Tabela de Taxas por Bairro / KM
     cur.execute("""
         CREATE TABLE IF NOT EXISTS bairros (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -59,7 +57,6 @@ def init_db():
         )
     """)
 
-    # Tabela de Pedidos
     cur.execute("""
         CREATE TABLE IF NOT EXISTS pedidos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -75,11 +72,23 @@ def init_db():
             subtotal REAL NOT NULL,
             taxa_entrega REAL NOT NULL,
             total REAL NOT NULL,
-            status TEXT DEFAULT 'Recebido'
+            status TEXT DEFAULT 'Recebido',
+            status_pagamento TEXT DEFAULT 'Pagar na Entrega',
+            link_pagamento TEXT DEFAULT ''
         )
     """)
 
-    # Popula cardápio fictício inicial se estiver vazio
+    # Garante compatibilidade caso o banco ja existisse antes dessa atualizacao
+    for coluna_sql in [
+        "ALTER TABLE pedidos ADD COLUMN status_pagamento TEXT DEFAULT 'Pagar na Entrega'",
+        "ALTER TABLE pedidos ADD COLUMN link_pagamento TEXT DEFAULT ''"
+    ]:
+        try:
+            cur.execute(coluna_sql)
+        except sqlite3.OperationalError:
+            pass
+
+    # Cardápio fictício inicial
     cur.execute("SELECT COUNT(*) FROM produtos")
     if cur.fetchone()[0] == 0:
         produtos_iniciais = [
@@ -99,7 +108,7 @@ def init_db():
             produtos_iniciais
         )
 
-    # Popula taxas iniciais por Bairro / KM se estiver vazio
+    # Taxas iniciais por Bairro / KM
     cur.execute("SELECT COUNT(*) FROM bairros")
     if cur.fetchone()[0] == 0:
         bairros_iniciais = [
@@ -108,10 +117,7 @@ def init_db():
             ("De 5 km a 8 km (Bairros Médios)", 12.00),
             ("De 8 km a 12 km (Bairros Afastados)", 16.00),
         ]
-        cur.executemany(
-            "INSERT INTO bairros (nome, taxa) VALUES (?, ?)",
-            bairros_iniciais
-        )
+        cur.executemany("INSERT INTO bairros (nome, taxa) VALUES (?, ?)", bairros_iniciais)
 
     conn.commit()
     conn.close()
@@ -120,7 +126,7 @@ def init_db():
 init_db()
 
 # ==========================================
-# 3. ROTAS DE PÁGINAS (CLIENTE E PAINEL)
+# 3. ROTAS DE PÁGINAS
 # ==========================================
 @app.route("/")
 def pagina_cliente():
@@ -155,6 +161,13 @@ def api_dados():
 def criar_pedido():
     dados = request.json
     agora = datetime.now(FUSO_HORARIO).strftime("%d/%m/%Y %H:%M")
+    forma_pag = dados.get("forma_pagamento", "Pix")
+
+    # Define o status inicial do pagamento automaticamente
+    if forma_pag in ["Pix", "Cartão Online (Link)"]:
+        status_pag = "Aguardando Pagamento"
+    else:
+        status_pag = "Pagar na Entrega"
 
     conn = conectar_db()
     cur = conn.cursor()
@@ -162,8 +175,9 @@ def criar_pedido():
         INSERT INTO pedidos (
             data_hora, cliente_nome, cliente_whatsapp, tipo_entrega,
             bairro, endereco, forma_pagamento, troco_para,
-            itens_json, subtotal, taxa_entrega, total, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Recebido')
+            itens_json, subtotal, taxa_entrega, total, status,
+            status_pagamento, link_pagamento
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Recebido', ?, '')
     """, (
         agora,
         dados.get("cliente_nome", "").strip(),
@@ -171,12 +185,13 @@ def criar_pedido():
         dados.get("tipo_entrega", "Entrega"),
         dados.get("bairro", ""),
         dados.get("endereco", ""),
-        dados.get("forma_pagamento", "Pix"),
+        forma_pag,
         dados.get("troco_para", ""),
         json.dumps(dados.get("itens", []), ensure_ascii=False),
         float(dados.get("subtotal", 0)),
         float(dados.get("taxa_entrega", 0)),
-        float(dados.get("total", 0))
+        float(dados.get("total", 0)),
+        status_pag
     ))
     pedido_id = cur.lastrowid
     conn.commit()
@@ -197,7 +212,7 @@ def consultar_pedido(pedido_id):
 
 
 # ==========================================
-# 5. API DO PAINEL DA COZINHA / ADMIN
+# 5. API DO PAINEL DA COZINHA + PAGAMENTOS
 # ==========================================
 @app.route("/api/admin/pedidos")
 def listar_pedidos_admin():
@@ -220,6 +235,41 @@ def atualizar_status(pedido_id):
     conn.commit()
     conn.close()
     return jsonify({"sucesso": True})
+
+
+@app.route("/api/admin/pedidos/<int:pedido_id>/pagamento", methods=["POST"])
+def atualizar_pagamento(pedido_id):
+    """Permite confirmar pagamento ou salvar o Link da Ton gerado no celular."""
+    d = request.json or {}
+    conn = conectar_db()
+    if "status_pagamento" in d:
+        conn.execute("UPDATE pedidos SET status_pagamento = ? WHERE id = ?", (d["status_pagamento"], pedido_id))
+    if "link_pagamento" in d:
+        conn.execute("UPDATE pedidos SET link_pagamento = ? WHERE id = ?", (d["link_pagamento"].strip(), pedido_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"sucesso": True})
+
+
+@app.route("/api/webhook/pagamento", methods=["POST"])
+def webhook_pagamento():
+    """
+    Rota ja estruturada para integracao futura com gateway de API aberta
+    (ex: Mercado Pago ou Pagar.me). Quando o pagamento for aprovado,
+    esta rota recebe a notificacao e marca o pedido como 'Pago' sozinha.
+    """
+    dados = request.json or {}
+    pedido_id = dados.get("pedido_id") or dados.get("external_reference")
+    status_evento = str(dados.get("status", "")).lower()
+
+    if pedido_id and status_evento in ["approved", "paid", "pago"]:
+        conn = conectar_db()
+        conn.execute("UPDATE pedidos SET status_pagamento = 'Pago' WHERE id = ?", (int(pedido_id),))
+        conn.commit()
+        conn.close()
+        return jsonify({"sucesso": True, "mensagem": f"Pedido #{pedido_id} marcado como Pago."}), 200
+
+    return jsonify({"recebido": True}), 200
 
 
 @app.route("/api/admin/produtos", methods=["GET", "POST"])
@@ -305,6 +355,7 @@ TEMPLATE_RECIBO_80MM = """
         .item { margin-bottom: 6px; }
         .sub { font-size: 12px; padding-left: 8px; }
         .total-box { font-size: 16px; font-weight: bold; margin-top: 4px; }
+        .aviso-pag { border: 2px solid #000; padding: 4px; text-align: center; font-weight: bold; margin: 6px 0; }
         .rodape { margin-top: 12px; text-align: center; font-size: 11px; }
     </style>
 </head>
@@ -350,10 +401,19 @@ TEMPLATE_RECIBO_80MM = """
     <div class="total-box">TOTAL: R$ {{ "%.2f"|format(p.total) }}</div>
 
     <div class="linha"></div>
-    <div><span class="negrito">PAGAMENTO:</span> {{ p.forma_pagamento }}</div>
+    <div><span class="negrito">FORMA PAG.:</span> {{ p.forma_pagamento }}</div>
     {% if p.troco_para %}
     <div class="negrito">TROCO PARA: R$ {{ p.troco_para }}</div>
     {% endif %}
+
+    <div class="aviso-pag">
+        {% if p.status_pagamento == 'Pago' %}
+            *** PEDIDO JÁ PAGO ONLINE ***<br>NÃO COBRAR NA ENTREGA
+        {% else %}
+            *** {{ p.status_pagamento | upper }} ***
+            {% if 'Cartão na entrega' in p.forma_pagamento %}<br>LEVAR MAQUININHA TON{% endif %}
+        {% endif %}
+    </div>
 
     <div class="rodape">Obrigado pela preferência!<br>{{ loja }}</div>
     <br><br>
