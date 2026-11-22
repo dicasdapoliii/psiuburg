@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel Cozinha - {{ nome_loja }}</title>
+    <style>
+        :root { --bg: #121212; --card: #1e1e1e; --amarelo: #ffc107; --verde: #28a745; --azul: #17a2b8; --vermelho: #dc3545; }
+        * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; }
+        body { background: var(--bg); color: #f1f1f1; padding: 16px; }
+
+        .topo {
+            display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+            gap: 10px; padding-bottom: 14px; border-bottom: 2px solid var(--amarelo); margin-bottom: 18px;
+        }
+        .topo h1 { color: var(--amarelo); font-size: 22px; }
+        .botoes-topo { display: flex; gap: 8px; flex-wrap: wrap; }
+        button { cursor: pointer; border: none; border-radius: 8px; padding: 9px 14px; font-weight: bold; font-size: 13px; }
+        .btn-amarelo { background: var(--amarelo); color: #000; }
+        .btn-verde { background: var(--verde); color: #fff; }
+        .btn-azul { background: var(--azul); color: #fff; }
+        .btn-cinza { background: #333; color: #fff; }
+        .btn-vermelho { background: var(--vermelho); color: #fff; }
+
+        .abas { display: flex; gap: 10px; margin-bottom: 18px; }
+        .aba-btn { background: #262626; color: #ccc; padding: 10px 18px; border-radius: 8px; }
+        .aba-btn.ativa { background: var(--amarelo); color: #000; }
+
+        .grid-pedidos { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 14px; }
+        .card-pedido {
+            background: var(--card); border: 1px solid #333; border-radius: 12px; padding: 14px;
+            border-left: 5px solid var(--amarelo);
+        }
+        .card-pedido.status-Concluído { opacity: 0.6; border-left-color: #666; }
+        .card-pedido.status-NaChapa { border-left-color: var(--azul); }
+        .card-pedido.status-Saiu { border-left-color: var(--verde); }
+
+        .cab-pedido { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 15px; }
+        .badge { padding: 3px 9px; border-radius: 12px; font-size: 12px; background: #333; color: var(--amarelo); }
+        .itens-lista { background: #141414; padding: 10px; border-radius: 8px; margin: 10px 0; font-size: 13px; }
+        .acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+
+        .painel-form { background: var(--card); padding: 16px; border-radius: 12px; margin-bottom: 18px; max-width: 700px; }
+        .painel-form input, .painel-form select {
+            width: 100%; padding: 10px; margin: 6px 0 10px; background: #111; border: 1px solid #333; color: #fff; border-radius: 8px;
+        }
+        .linha-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px; background: #181818; border-radius: 8px; margin-bottom: 6px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="topo">
+    <h1>🍔 Painel da Cozinha — {{ nome_loja }}</h1>
+    <div class="botoes-topo">
+        <button id="btnSom" class="btn-vermelho" onclick="ativarSom()">🔇 Ativar Alerta Sonoro</button>
+        <button class="btn-cinza" onclick="carregarPedidos()">🔄 Atualizar</button>
+        <a href="/" target="_blank"><button class="btn-amarelo">📱 Abrir Cardápio</button></a>
+    </div>
+</div>
+
+<div class="abas">
+    <button class="aba-btn ativa" id="tabPedidosBtn" onclick="trocarAba('pedidos')">📋 Pedidos ao Vivo</button>
+    <button class="aba-btn" id="tabGestaoBtn" onclick="trocarAba('gestao')">⚙️ Cardápio & Taxas</button>
+</div>
+
+<!-- ABA 1: PEDIDOS -->
+<div id="abaPedidos">
+    <div class="grid-pedidos" id="listaPedidos">Carregando pedidos...</div>
+</div>
+
+<!-- ABA 2: GERENCIAR CARDÁPIO E TAXAS -->
+<div id="abaGestao" style="display:none;">
+    <div class="painel-form">
+        <h3 style="color:var(--amarelo); margin-bottom:10px;">+ Novo Produto no Cardápio</h3>
+        <input id="pNome" placeholder="Nome do lanche (ex: Psiu! Cheddar)">
+        <select id="pCat">
+            <option value="Burgers">Burgers</option>
+            <option value="Combos">Combos</option>
+            <option value="Porções">Porções</option>
+            <option value="Bebidas">Bebidas</option>
+        </select>
+        <input id="pDesc" placeholder="Descrição dos ingredientes">
+        <input id="pPreco" type="number" step="0.01" placeholder="Preço (ex: 29.90)">
+        <button class="btn-amarelo" onclick="salvarProduto()">Salvar Produto</button>
+    </div>
+
+    <div class="painel-form">
+        <h3 style="color:var(--amarelo); margin-bottom:10px;">Produtos Cadastrados</h3>
+        <div id="listaAdminProdutos"></div>
+    </div>
+
+    <div class="painel-form">
+        <h3 style="color:var(--amarelo); margin-bottom:10px;">+ Nova Faixa de Entrega (Bairro / KM)</h3>
+        <input id="bNome" placeholder="Ex: Bairro CPA (até 6 km)">
+        <input id="bTaxa" type="number" step="0.01" placeholder="Taxa R$ (ex: 10.00)">
+        <button class="btn-amarelo" onclick="salvarBairro()">Adicionar Taxa</button>
+        <div id="listaAdminBairros" style="margin-top:12px;"></div>
+    </div>
+</div>
+
+<script>
+    let somAtivo = false;
+    let ultimoIdVisto = 0;
+    let primeiraCarga = true;
+    let audioCtx = null;
+
+    const fmt = v => "R$ " + Number(v).toFixed(2).replace(".", ",");
+
+    function ativarSom() {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        somAtivo = true;
+        const btn = document.getElementById("btnSom");
+        btn.className = "btn-verde";
+        btn.innerText = "🔔 Alerta Sonoro Ativo";
+        tocarCampainha();
+    }
+
+    function tocarCampainha() {
+        if (!somAtivo || !audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(1174, audioCtx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.5);
+    }
+
+    function trocarAba(aba) {
+        document.getElementById("abaPedidos").style.display = aba === "pedidos" ? "block" : "none";
+        document.getElementById("abaGestao").style.display = aba === "gestao" ? "block" : "none";
+        document.getElementById("tabPedidosBtn").classList.toggle("ativa", aba === "pedidos");
+        document.getElementById("tabGestaoBtn").classList.toggle("ativa", aba === "gestao");
+        if (aba === "gestao") carregarGestao();
+    }
+
+    async function carregarPedidos() {
+        const r = await fetch("/api/admin/pedidos");
+        const pedidos = await r.json();
+
+        if (pedidos.length > 0) {
+            const maiorId = pedidos[0].id;
+            if (!primeiraCarga && maiorId > ultimoIdVisto) {
+                tocarCampainha();
+            }
+            ultimoIdVisto = maiorId;
+        }
+        primeiraCarga = false;
+
+        if (pedidos.length === 0) {
+            document.getElementById("listaPedidos").innerHTML = "<p style='color:#888;'>Nenhum pedido recebido ainda. Faça um teste no cardápio!</p>";
+            return;
+        }
+
+        document.getElementById("listaPedidos").innerHTML = pedidos.map(p => {
+            const classeStatus = p.status.replace(/\s+/g, '');
+            return `
+            <div class="card-pedido status-${classeStatus}">
+                <div class="cab-pedido">
+                    <strong>Pedido #${p.id} • ${p.data_hora.split(' ')[1]}</strong>
+                    <span class="badge">${p.status}</span>
+                </div>
+                <div><strong>${p.cliente_nome}</strong> (${p.cliente_whatsapp})</div>
+                <div style="font-size:13px; color:#ccc; margin-top:4px;">
+                    ${p.tipo_entrega === 'Entrega' ? `🛵 <strong>${p.bairro}</strong> — ${p.endereco}` : '🏪 <strong>Retirada no Balcão (Grátis)</strong>'}
+                </div>
+
+                <div class="itens-lista">
+                    ${p.itens.map(it => `
+                        <div style="margin-bottom:4px;">
+                            <strong>${it.qtd}x ${it.nome}</strong> (${fmt(it.total_item)})
+                            ${it.adicionais && it.adicionais.length ? `<div style="color:#aaa; padding-left:10px;">+ ${it.adicionais.map(a=>a.nome).join(', ')}</div>` : ''}
+                            ${it.obs ? `<div style="color:var(--amarelo); padding-left:10px;">Obs: ${it.obs}</div>` : ''}
+                        </div>
+                    `).join("")}
+                </div>
+
+                <div style="font-size:14px;">
+                    <strong>Total: ${fmt(p.total)}</strong> • ${p.forma_pagamento}
+                    ${p.troco_para ? `<span style="color:var(--amarelo);"> (Troco p/ R$ ${p.troco_para})</span>` : ''}
+                </div>
+
+                <div class="acoes">
+                    <button class="btn-amarelo" onclick="imprimir80mm(${p.id})">🖨️ Imprimir 80mm</button>
+                    ${p.status === 'Recebido' ? `<button class="btn-azul" onclick="mudarStatus(${p.id}, 'Na Chapa')">🔥 Aceitar (Na Chapa)</button>` : ''}
+                    ${p.status === 'Na Chapa' ? `<button class="btn-verde" onclick="mudarStatus(${p.id}, 'Saiu para Entrega')">🛵 Saiu p/ Entrega</button>` : ''}
+                    ${p.status !== 'Concluído' ? `<button class="btn-cinza" onclick="mudarStatus(${p.id}, 'Concluído')">✅ Concluir</button>` : ''}
+                    <button class="btn-cinza" style="background:#128C7E;" onclick="avisarWhats('${p.cliente_whatsapp}', ${p.id}, '${p.status}')">💬 Whats</button>
+                </div>
+            </div>`;
+        }).join("");
+    }
+
+    function imprimir80mm(id) {
+        window.open(`/imprimir/${id}`, "Impressao80mm", "width=340,height=600");
+    }
+
+    async function mudarStatus(id, status) {
+        await fetch(`/api/admin/pedidos/${id}/status`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status })
+        });
+        carregarPedidos();
+    }
+
+    function avisarWhats(fone, id, status) {
+        const limpo = fone.replace(/\D/g, "");
+        const num = limpo.startsWith("55") ? limpo : "55" + limpo;
+        const msg = encodeURIComponent(`Olá! Atualização do seu pedido #${id} na PSIU! BURG: Status atual -> *${status}* 🍔🔥`);
+        window.open(`https://wa.me/${num}?text=${msg}`, "_blank");
+    }
+
+    async function carregarGestao() {
+        const r = await fetch("/api/admin/produtos");
+        const d = await r.json();
+
+        document.getElementById("listaAdminProdutos").innerHTML = d.produtos.map(p => `
+            <div class="linha-item">
+                <div><strong>${p.nome}</strong> (${p.categoria}) — ${fmt(p.preco)} ${p.ativo ? '' : '<span style="color:#ff5252;">[PAUSADO]</span>'}</div>
+                <div style="display:flex; gap:6px;">
+                    <button class="btn-cinza" onclick="toggleProd(${p.id})">${p.ativo ? 'Pausar' : 'Ativar'}</button>
+                    <button class="btn-vermelho" onclick="delProd(${p.id})">✕</button>
+                </div>
+            </div>
+        `).join("");
+
+        document.getElementById("listaAdminBairros").innerHTML = d.bairros.map(b => `
+            <div class="linha-item">
+                <div>${b.nome} — <strong>${fmt(b.taxa)}</strong></div>
+                <button class="btn-vermelho" onclick="delBairro(${b.id})">✕</button>
+            </div>
+        `).join("");
+    }
+
+    async function salvarProduto() {
+        const nome = document.getElementById("pNome").value.trim();
+        const preco = document.getElementById("pPreco").value;
+        if (!nome || !preco) return alert("Preencha nome e preço!");
+        await fetch("/api/admin/produtos", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                nome,
+                categoria: document.getElementById("pCat").value,
+                descricao: document.getElementById("pDesc").value.trim(),
+                preco
+            })
+        });
+        document.getElementById("pNome").value = "";
+        document.getElementById("pDesc").value = "";
+        document.getElementById("pPreco").value = "";
+        carregarGestao();
+    }
+
+    async function toggleProd(id) { await fetch(`/api/admin/produtos/${id}/toggle`, { method: "POST" }); carregarGestao(); }
+    async function delProd(id) { if (confirm("Excluir produto?")) { await fetch(`/api/admin/produtos/${id}`, { method: "DELETE" }); carregarGestao(); } }
+
+    async function salvarBairro() {
+        const nome = document.getElementById("bNome").value.trim();
+        const taxa = document.getElementById("bTaxa").value;
+        if (!nome || !taxa) return alert("Preencha bairro/KM e taxa!");
+        await fetch("/api/admin/bairros", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nome, taxa })
+        });
+        document.getElementById("bNome").value = "";
+        document.getElementById("bTaxa").value = "";
+        carregarGestao();
+    }
+
+    async function delBairro(id) { await fetch(`/api/admin/bairros/${id}`, { method: "DELETE" }); carregarGestao(); }
+
+    carregarPedidos();
+    setInterval(carregarPedidos, 5000);
+</script>
+</body>
+</html>
