@@ -20,6 +20,7 @@
         .btn-verde { background: var(--verde); color: #fff; }
         .btn-ton { background: #00a868; color: #fff; }
         .btn-azul { background: var(--azul); color: #fff; }
+        .btn-roxo { background: #6f42c1; color: #fff; }
         .btn-cinza { background: #333; color: #fff; }
         .btn-vermelho { background: var(--vermelho); color: #fff; }
 
@@ -55,7 +56,6 @@
             padding: 10px; background: #181818; border-radius: 8px; margin-bottom: 6px;
         }
 
-        /* Fluxo de Caixa */
         .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 14px 0 20px; }
         .kpi-card { background: var(--card); border: 1px solid #333; border-radius: 12px; padding: 16px; }
         .kpi-card small { color: #aaa; font-size: 12px; }
@@ -79,7 +79,7 @@
 <div class="abas">
     <button class="aba-btn ativa" id="tabPedidosBtn" onclick="trocarAba('pedidos')">📋 Pedidos ao Vivo</button>
     <button class="aba-btn" id="tabFinanceiroBtn" onclick="trocarAba('financeiro')">💰 Fluxo de Caixa</button>
-    <button class="aba-btn" id="tabGestaoBtn" onclick="trocarAba('gestao')">⚙️ Cardápio & Taxas</button>
+    <button class="aba-btn" id="tabGestaoBtn" onclick="trocarAba('gestao')">⚙️ Cardápio & Taxas (KM)</button>
 </div>
 
 <!-- ABA 1: PEDIDOS -->
@@ -87,7 +87,7 @@
     <div class="grid-pedidos" id="listaPedidos">Carregando pedidos...</div>
 </div>
 
-<!-- ABA 2: FLUXO DE CAIXA E HISTORICO MENSAL -->
+<!-- ABA 2: FLUXO DE CAIXA -->
 <div id="abaFinanceiro" style="display:none;">
     <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
         <label style="font-weight:bold;">Filtrar Mês:</label>
@@ -136,8 +136,19 @@
     </div>
 </div>
 
-<!-- ABA 3: CARDAPIO E TAXAS -->
+<!-- ABA 3: CARDAPIO E TAXAS POR KM -->
 <div id="abaGestao" style="display:none;">
+    <div class="painel-form">
+        <h3 style="color:var(--amarelo); margin-bottom:6px;">🛵 Tabela de Taxa de Entrega por Quilometragem</h3>
+        <p style="font-size:13px; color:#aaa; margin-bottom:10px;">
+            O sistema calcula a distância automaticamente e aplica a taxa correspondente abaixo:
+        </p>
+        <input id="fKm" type="number" step="0.5" placeholder="Até quantos KM? (ex: 3)">
+        <input id="fTaxa" type="number" step="0.50" placeholder="Valor da taxa em R$ (ex: 6.00)">
+        <button class="btn-amarelo" onclick="salvarFaixa()">+ Adicionar Faixa de KM</button>
+        <div id="listaAdminFaixas" style="margin-top:12px;"></div>
+    </div>
+
     <div class="painel-form">
         <h3 style="color:var(--amarelo); margin-bottom:10px;">+ Novo Produto no Cardápio</h3>
         <input id="pNome" placeholder="Nome do lanche (ex: Psiu! Cheddar)">
@@ -156,14 +167,6 @@
         <h3 style="color:var(--amarelo); margin-bottom:10px;">Produtos Cadastrados</h3>
         <div id="listaAdminProdutos"></div>
     </div>
-
-    <div class="painel-form">
-        <h3 style="color:var(--amarelo); margin-bottom:10px;">+ Nova Faixa de Entrega (Bairro / KM)</h3>
-        <input id="bNome" placeholder="Ex: Bairro CPA (até 6 km)">
-        <input id="bTaxa" type="number" step="0.01" placeholder="Taxa R$ (ex: 10.00)">
-        <button class="btn-amarelo" onclick="salvarBairro()">Adicionar Taxa</button>
-        <div id="listaAdminBairros" style="margin-top:12px;"></div>
-    </div>
 </div>
 
 <script>
@@ -171,10 +174,9 @@
     let ultimoIdVisto = 0;
     let primeiraCarga = true;
     let audioCtx = null;
+    let PEDIDOS_CACHE = {};
 
     const fmt = v => "R$ " + Number(v).toFixed(2).replace(".", ",");
-
-    // Define o mes atual no filtro do fluxo de caixa
     const hoje = new Date();
     document.getElementById("filtroMes").value = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
 
@@ -237,6 +239,9 @@
             return;
         }
 
+        PEDIDOS_CACHE = {};
+        pedidos.forEach(p => PEDIDOS_CACHE[p.id] = p);
+
         document.getElementById("listaPedidos").innerHTML = pedidos.map(p => {
             const classeStatus = p.status.replace(/\s+/g, '');
             return `
@@ -250,7 +255,9 @@
                     <div style="margin-top:4px;">${renderBadgePagamento(p.status_pagamento)}</div>
                 </div>
                 <div style="font-size:13px; color:#ccc;">
-                    ${p.tipo_entrega === 'Entrega' ? `🛵 <strong>${p.bairro}</strong> — ${p.endereco}` : '🏪 <strong>Retirada no Balcão (Grátis)</strong>'}
+                    ${p.tipo_entrega === 'Entrega'
+                        ? `🛵 ${p.endereco} ${p.distancia_km ? `(${p.distancia_km} km)` : ''}`
+                        : '🏪 <strong>Retirada no Balcão (Grátis)</strong>'}
                 </div>
 
                 <div class="itens-lista">
@@ -269,21 +276,51 @@
                 </div>
 
                 <div class="acoes">
-                    <button class="btn-amarelo" onclick="imprimir80mm(${p.id})">🖨️ Imprimir 80mm</button>
+                    <button class="btn-amarelo" onclick="imprimir80mm(${p.id})">🖨️ 80mm</button>
+
+                    ${p.tipo_entrega === 'Entrega' ? `<button class="btn-roxo" onclick="enviarEntregador(${p.id})">🛵 Enviar p/ Entregador</button>` : ''}
 
                     ${p.status !== 'Cancelado' && p.status_pagamento !== 'Pago' ? `
                         ${p.forma_pagamento.includes('Link') ? `<button class="btn-ton" onclick="enviarLinkTon(${p.id}, '${p.cliente_whatsapp}', ${p.total})">🔗 Link Ton</button>` : ''}
-                        <button class="btn-verde" onclick="confirmarPago(${p.id})">✅ Confirmar Pago</button>
+                        <button class="btn-verde" onclick="confirmarPago(${p.id})">✅ Pago</button>
                     ` : ''}
 
                     ${p.status === 'Recebido' ? `<button class="btn-azul" onclick="mudarStatus(${p.id}, 'Na Chapa')">🔥 Na Chapa</button>` : ''}
                     ${p.status === 'Na Chapa' ? `<button class="btn-verde" onclick="mudarStatus(${p.id}, 'Saiu para Entrega')">🛵 Saiu</button>` : ''}
                     ${p.status !== 'Concluído' && p.status !== 'Cancelado' ? `<button class="btn-cinza" onclick="mudarStatus(${p.id}, 'Concluído')">✔ Concluir</button>` : ''}
-                    ${p.status !== 'Cancelado' ? `<button class="btn-vermelho" onclick="cancelarPedido(${p.id})">❌ Cancelar</button>` : ''}
-                    <button class="btn-cinza" style="background:#128C7E;" onclick="avisarWhats('${p.cliente_whatsapp}', ${p.id}, '${p.status}')">💬 Whats</button>
+                    ${p.status !== 'Cancelado' ? `<button class="btn-vermelho" onclick="cancelarPedido(${p.id})">❌</button>` : ''}
+                    <button class="btn-cinza" style="background:#128C7E;" onclick="avisarWhats('${p.cliente_whatsapp}', ${p.id}, '${p.status}')">💬 Cliente</button>
                 </div>
             </div>`;
         }).join("");
+    }
+
+    function enviarEntregador(id) {
+        const p = PEDIDOS_CACHE[id];
+        if (!p) return;
+
+        const avisoPag = p.status_pagamento === "Pago"
+            ? "✅ *JÁ PAGO ONLINE (NÃO COBRAR)*"
+            : `💰 *COBRAR NA ENTREGA:* ${fmt(p.total)} (${p.forma_pagamento})` + (p.troco_para ? ` — Troco p/ R$ ${p.troco_para}` : "");
+
+        const linkMapa = p.link_maps
+            ? p.link_maps
+            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.endereco + ", Rondonópolis - MT")}`;
+
+        const msg =
+`🛵 *ENTREGA — PEDIDO #${p.id}*
+
+👤 *Cliente:* ${p.cliente_nome}
+📞 *Telefone:* ${p.cliente_whatsapp}
+🏠 *Endereço:* ${p.endereco}
+
+📍 *Localização no Mapa:*
+${linkMapa}
+
+${avisoPag}`;
+
+        // Abre o WhatsApp para voce escolher o contato/grupo do entregador
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
     }
 
     async function carregarFinanceiro() {
@@ -293,10 +330,8 @@
 
         document.getElementById("kpiPago").innerText = fmt(d.total_pago);
         document.getElementById("kpiQtdPago").innerText = `${d.qtd_pago} pedidos pagos`;
-
         document.getElementById("kpiNaoPago").innerText = fmt(d.total_nao_pago);
         document.getElementById("kpiQtdNaoPago").innerText = `${d.qtd_nao_pago} pedidos pendentes`;
-
         document.getElementById("kpiCancelado").innerText = fmt(d.total_cancelado);
         document.getElementById("kpiQtdCancelado").innerText = `${d.qtd_cancelado} cancelados`;
 
@@ -323,14 +358,12 @@
     async function enviarLinkTon(id, fone, total) {
         const link = prompt(`Cole aqui o Link de Pagamento gerado no app da Ton (Valor: ${fmt(total)}):`);
         if (!link || !link.trim()) return;
-
         await fetch(`/api/admin/pedidos/${id}/pagamento`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ link_pagamento: link.trim() })
         });
         carregarPedidos();
-
         const limpo = fone.replace(/\D/g, "");
         const num = limpo.startsWith("55") ? limpo : "55" + limpo;
         const msg = encodeURIComponent(`Olá! Segue o link seguro para pagamento do seu pedido #${id} (${fmt(total)}) na PSIU! BURG 🍔:\n\n${link.trim()}`);
@@ -373,6 +406,13 @@
         const r = await fetch("/api/admin/produtos");
         const d = await r.json();
 
+        document.getElementById("listaAdminFaixas").innerHTML = d.faixas.map(f => `
+            <div class="linha-item">
+                <div>Até <strong>${f.ate_km} km</strong> — <strong>${fmt(f.taxa)}</strong></div>
+                <button class="btn-vermelho" onclick="delFaixa(${f.id})">✕</button>
+            </div>
+        `).join("");
+
         document.getElementById("listaAdminProdutos").innerHTML = d.produtos.map(p => `
             <div class="linha-item">
                 <div><strong>${p.nome}</strong> (${p.categoria}) — ${fmt(p.preco)} ${p.ativo ? '' : '<span style="color:#ff5252;">[PAUSADO]</span>'}</div>
@@ -382,14 +422,23 @@
                 </div>
             </div>
         `).join("");
-
-        document.getElementById("listaAdminBairros").innerHTML = d.bairros.map(b => `
-            <div class="linha-item">
-                <div>${b.nome} — <strong>${fmt(b.taxa)}</strong></div>
-                <button class="btn-vermelho" onclick="delBairro(${b.id})">✕</button>
-            </div>
-        `).join("");
     }
+
+    async function salvarFaixa() {
+        const ate_km = document.getElementById("fKm").value;
+        const taxa = document.getElementById("fTaxa").value;
+        if (!ate_km || !taxa) return alert("Preencha a quilometragem e o valor da taxa!");
+        await fetch("/api/admin/faixas", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ate_km, taxa })
+        });
+        document.getElementById("fKm").value = "";
+        document.getElementById("fTaxa").value = "";
+        carregarGestao();
+    }
+
+    async function delFaixa(id) { if (confirm("Excluir esta faixa de KM?")) { await fetch(`/api/admin/faixas/${id}`, { method: "DELETE" }); carregarGestao(); } }
 
     async function salvarProduto() {
         const nome = document.getElementById("pNome").value.trim();
@@ -411,22 +460,6 @@
 
     async function toggleProd(id) { await fetch(`/api/admin/produtos/${id}/toggle`, { method: "POST" }); carregarGestao(); }
     async function delProd(id) { if (confirm("Excluir produto?")) { await fetch(`/api/admin/produtos/${id}`, { method: "DELETE" }); carregarGestao(); } }
-
-    async function salvarBairro() {
-        const nome = document.getElementById("bNome").value.trim();
-        const taxa = document.getElementById("bTaxa").value;
-        if (!nome || !taxa) return alert("Preencha bairro/KM e taxa!");
-        await fetch("/api/admin/bairros", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ nome, taxa })
-        });
-        document.getElementById("bNome").value = "";
-        document.getElementById("bTaxa").value = "";
-        carregarGestao();
-    }
-
-    async function delBairro(id) { if (confirm("Excluir taxa?")) { await fetch(`/api/admin/bairros/${id}`, { method: "DELETE" }); carregarGestao(); } }
 
     carregarPedidos();
     setInterval(carregarPedidos, 5000);
