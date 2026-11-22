@@ -25,6 +25,10 @@ LAT_LOJA = -16.4708
 LNG_LOJA = -54.6356
 TAXA_PADRAO_SE_NAO_LOCALIZAR = 8.00
 
+# Configuracao opcional para envio 100% automatico de WhatsApp (configure no Render)
+# Exemplo para Green-API: WHATSAPP_API_URL = https://api.green-api.com/waInstanceXXXX/sendMessage/SEU_TOKEN
+WHATSAPP_API_URL = os.environ.get("WHATSAPP_API_URL", "").strip()
+
 # Banco de Dados Permanente (PostgreSQL no Neon)
 db_url = os.environ.get("DATABASE_URL", "sqlite:///psiuburg.db")
 if db_url.startswith("postgres://"):
@@ -76,6 +80,7 @@ class Cliente(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(150), nullable=False)
     cpf = db.Column(db.String(20), default="")
+    senha = db.Column(db.String(100), default="")
     whatsapp = db.Column(db.String(30), unique=True, nullable=False)
     cep = db.Column(db.String(20), default="")
     rua = db.Column(db.String(200), default="")
@@ -83,9 +88,25 @@ class Cliente(db.Model):
     bairro = db.Column(db.String(150), default="")
     complemento = db.Column(db.String(200), default="")
     endereco = db.Column(db.String(255), default="")
+    enderecos_json = db.Column(db.Text, default="[]")
     lat = db.Column(db.Float, nullable=True)
     lng = db.Column(db.Float, nullable=True)
     criado_em = db.Column(db.String(30), default="")
+
+    def get_enderecos(self):
+        try:
+            lista = json.loads(self.enderecos_json or "[]")
+        except Exception:
+            lista = []
+        if not lista and self.rua:
+            lista = [{
+                "apelido": "Principal",
+                "cep": self.cep or "", "rua": self.rua or "", "numero": self.numero or "",
+                "bairro": self.bairro or "", "complemento": self.complemento or "",
+                "endereco": self.endereco or f"{self.rua}, {self.numero} - {self.bairro}",
+                "lat": self.lat, "lng": self.lng
+            }]
+        return lista
 
     def to_dict(self):
         return {
@@ -93,7 +114,8 @@ class Cliente(db.Model):
             "whatsapp": self.whatsapp,
             "cep": self.cep or "", "rua": self.rua or "", "numero": self.numero or "",
             "bairro": self.bairro or "", "complemento": self.complemento or "",
-            "endereco": self.endereco or "", "lat": self.lat, "lng": self.lng
+            "endereco": self.endereco or "", "enderecos": self.get_enderecos(),
+            "lat": self.lat, "lng": self.lng
         }
 
 
@@ -133,8 +155,29 @@ class Pedido(db.Model):
         }
 
 
-def limpar_telefone(fone):
-    return "".join(c for c in str(fone or "") if c.isdigit())
+def limpar_numeros(valor):
+    return "".join(c for c in str(valor or "") if c.isdigit())
+
+
+def enviar_whatsapp_automatico(telefone, mensagem):
+    """Envia mensagem automaticamente via API de WhatsApp se WHATSAPP_API_URL estiver no Render."""
+    if not WHATSAPP_API_URL or not telefone:
+        return False
+    try:
+        num = limpar_numeros(telefone)
+        if not num.startswith("55"):
+            num = "55" + num
+        payload = json.dumps({"chatId": f"{num}@c.us", "message": mensagem}).encode("utf-8")
+        req = urllib.request.Request(
+            WHATSAPP_API_URL,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            return resp.status == 200
+    except Exception:
+        return False
 
 
 def calcular_distancia_km(lat1, lng1, lat2, lng2):
@@ -176,9 +219,10 @@ def init_db():
     with app.app_context():
         db.create_all()
 
-        # Garante que bancos ja existentes no Neon recebam as novas colunas sem perder dados
         colunas_novas = [
             "ALTER TABLE clientes ADD COLUMN cpf VARCHAR(20) DEFAULT ''",
+            "ALTER TABLE clientes ADD COLUMN senha VARCHAR(100) DEFAULT ''",
+            "ALTER TABLE clientes ADD COLUMN enderecos_json TEXT DEFAULT '[]'",
             "ALTER TABLE clientes ADD COLUMN cep VARCHAR(20) DEFAULT ''",
             "ALTER TABLE clientes ADD COLUMN rua VARCHAR(200) DEFAULT ''",
             "ALTER TABLE clientes ADD COLUMN numero VARCHAR(40) DEFAULT ''",
@@ -293,30 +337,59 @@ def calcular_frete():
     })
 
 
-@app.route("/api/clientes/buscar", methods=["POST"])
-def buscar_cliente():
-    fone = limpar_telefone((request.json or {}).get("whatsapp", ""))
-    if not fone:
-        return jsonify({"encontrado": False})
+@app.route("/api/clientes/login", methods=["POST"])
+def login_cliente():
+    d = request.json or {}
+    cpf_dig = limpar_numeros(d.get("cpf", ""))
+    senha = str(d.get("senha", "")).strip()
 
-    cli = Cliente.query.filter_by(whatsapp=fone).first()
+    if not cpf_dig:
+        return jsonify({"sucesso": False, "erro": "Informe o CPF."})
+
+    # Procura comparando apenas os numeros do CPF
+    cli = None
+    for c in Cliente.query.all():
+        if limpar_numeros(c.cpf) == cpf_dig:
+            cli = c
+            break
+
     if not cli:
-        return jsonify({"encontrado": False})
+        return jsonify({"sucesso": False, "nao_encontrado": True, "erro": "CPF não cadastrado."})
 
-    pedidos = Pedido.query.filter_by(cliente_whatsapp=fone).order_by(Pedido.id.desc()).limit(10).all()
+    # Se o cliente ja tinha cadastro antigo sem senha, permite entrar e salva a senha digitada
+    if cli.senha and cli.senha != senha:
+        return jsonify({"sucesso": False, "erro": "Senha incorreta."})
+    if not cli.senha and senha:
+        cli.senha = senha
+        db.session.commit()
+
+    pedidos = Pedido.query.filter_by(cliente_whatsapp=cli.whatsapp).order_by(Pedido.id.desc()).limit(10).all()
     return jsonify({
-        "encontrado": True,
+        "sucesso": True,
         "cliente": cli.to_dict(),
         "pedidos": [p.to_dict() for p in pedidos]
     })
 
 
+@app.route("/api/clientes/buscar", methods=["POST"])
+def buscar_cliente():
+    fone = limpar_numeros((request.json or {}).get("whatsapp", ""))
+    if not fone:
+        return jsonify({"encontrado": False})
+    cli = Cliente.query.filter_by(whatsapp=fone).first()
+    if not cli:
+        return jsonify({"encontrado": False})
+    pedidos = Pedido.query.filter_by(cliente_whatsapp=fone).order_by(Pedido.id.desc()).limit(10).all()
+    return jsonify({"encontrado": True, "cliente": cli.to_dict(), "pedidos": [p.to_dict() for p in pedidos]})
+
+
 @app.route("/api/clientes/salvar", methods=["POST"])
 def salvar_cliente():
     d = request.json or {}
-    fone = limpar_telefone(d.get("whatsapp", ""))
+    fone = limpar_numeros(d.get("whatsapp", ""))
     nome = d.get("nome", "").strip()
     cpf = d.get("cpf", "").strip()
+    senha = str(d.get("senha", "")).strip()
     if not fone or not nome:
         return jsonify({"sucesso": False, "erro": "Informe nome e WhatsApp."}), 400
 
@@ -329,6 +402,13 @@ def salvar_cliente():
     lng = d.get("lng")
 
     endereco_fmt = f"{rua}, {numero} - {bairro}" + (f" ({complemento})" if complemento else "")
+    novo_end = {
+        "apelido": d.get("apelido", "Principal"),
+        "cep": cep, "rua": rua, "numero": numero, "bairro": bairro,
+        "complemento": complemento, "endereco": endereco_fmt,
+        "lat": float(lat) if lat is not None else None,
+        "lng": float(lng) if lng is not None else None
+    }
 
     cli = Cliente.query.filter_by(whatsapp=fone).first()
     agora = datetime.now(FUSO_HORARIO).strftime("%d/%m/%Y %H:%M")
@@ -337,6 +417,8 @@ def salvar_cliente():
         cli.nome = nome
         if cpf:
             cli.cpf = cpf
+        if senha:
+            cli.senha = senha
         cli.cep = cep
         cli.rua = rua
         cli.numero = numero
@@ -346,16 +428,53 @@ def salvar_cliente():
         if lat is not None and lng is not None:
             cli.lat = float(lat)
             cli.lng = float(lng)
+        lista = cli.get_enderecos()
+        if lista:
+            lista[0] = novo_end
+        else:
+            lista = [novo_end]
+        cli.enderecos_json = json.dumps(lista, ensure_ascii=False)
     else:
         cli = Cliente(
-            nome=nome, cpf=cpf, whatsapp=fone, cep=cep, rua=rua, numero=numero,
+            nome=nome, cpf=cpf, senha=senha, whatsapp=fone, cep=cep, rua=rua, numero=numero,
             bairro=bairro, complemento=complemento, endereco=endereco_fmt,
+            enderecos_json=json.dumps([novo_end], ensure_ascii=False),
             lat=float(lat) if lat is not None else None,
             lng=float(lng) if lng is not None else None,
             criado_em=agora
         )
         db.session.add(cli)
 
+    db.session.commit()
+    return jsonify({"sucesso": True, "cliente": cli.to_dict()})
+
+
+@app.route("/api/clientes/adicionar-endereco", methods=["POST"])
+def adicionar_endereco_cliente():
+    d = request.json or {}
+    fone = limpar_numeros(d.get("whatsapp", ""))
+    cli = Cliente.query.filter_by(whatsapp=fone).first()
+    if not cli:
+        return jsonify({"sucesso": False, "erro": "Cliente não encontrado."}), 404
+
+    rua = d.get("rua", "").strip()
+    numero = d.get("numero", "").strip()
+    bairro = d.get("bairro", "").strip()
+    complemento = d.get("complemento", "").strip()
+    cep = d.get("cep", "").strip()
+    lat = d.get("lat")
+    lng = d.get("lng")
+    endereco_fmt = f"{rua}, {numero} - {bairro}" + (f" ({complemento})" if complemento else "")
+
+    lista = cli.get_enderecos()
+    lista.append({
+        "apelido": d.get("apelido", f"Endereço {len(lista) + 1}"),
+        "cep": cep, "rua": rua, "numero": numero, "bairro": bairro,
+        "complemento": complemento, "endereco": endereco_fmt,
+        "lat": float(lat) if lat is not None else None,
+        "lng": float(lng) if lng is not None else None
+    })
+    cli.enderecos_json = json.dumps(lista, ensure_ascii=False)
     db.session.commit()
     return jsonify({"sucesso": True, "cliente": cli.to_dict()})
 
@@ -367,35 +486,10 @@ def criar_pedido():
     agora_str = agora_dt.strftime("%d/%m/%Y %H:%M")
     mes_ano = agora_dt.strftime("%Y-%m")
 
-    fone = limpar_telefone(dados.get("cliente_whatsapp", ""))
+    fone = limpar_numeros(dados.get("cliente_whatsapp", ""))
     nome = dados.get("cliente_nome", "").strip()
     forma_pag = dados.get("forma_pagamento", "Pix")
     status_pag = "Aguardando Pagamento" if forma_pag in ["Pix", "Cartão Online (Link)"] else "Pagar na Entrega"
-
-    if fone and nome:
-        cli = Cliente.query.filter_by(whatsapp=fone).first()
-        if cli:
-            cli.nome = nome
-            if dados.get("tipo_entrega") == "Entrega":
-                cli.cep = dados.get("cep", cli.cep)
-                cli.rua = dados.get("rua", cli.rua)
-                cli.numero = dados.get("numero", cli.numero)
-                cli.bairro = dados.get("bairro", cli.bairro)
-                cli.complemento = dados.get("complemento", cli.complemento)
-                cli.endereco = dados.get("endereco", cli.endereco)
-                if dados.get("lat") is not None:
-                    cli.lat = float(dados.get("lat"))
-                    cli.lng = float(dados.get("lng"))
-        else:
-            db.session.add(Cliente(
-                nome=nome, cpf=dados.get("cpf", ""), whatsapp=fone,
-                cep=dados.get("cep", ""), rua=dados.get("rua", ""),
-                numero=dados.get("numero", ""), bairro=dados.get("bairro", ""),
-                complemento=dados.get("complemento", ""), endereco=dados.get("endereco", ""),
-                lat=float(dados["lat"]) if dados.get("lat") is not None else None,
-                lng=float(dados["lng"]) if dados.get("lng") is not None else None,
-                criado_em=agora_str
-            ))
 
     novo = Pedido(
         data_hora=agora_str,
@@ -442,8 +536,19 @@ def listar_pedidos_admin():
 @app.route("/api/admin/pedidos/<int:pedido_id>/status", methods=["POST"])
 def atualizar_status(pedido_id):
     p = Pedido.query.get_or_404(pedido_id)
-    p.status = (request.json or {}).get("status", "Recebido")
+    novo_status = (request.json or {}).get("status", "Recebido")
+    p.status = novo_status
     db.session.commit()
+
+    # Dispara WhatsApp automatico se a API estiver configurada no Render
+    msgs = {
+        "Aceito": f"Olá {p.cliente_nome}! 👍 *Seu pedido #{p.id} foi aceito* na {NOME_LOJA}!",
+        "Em Preparo": f"Olá {p.cliente_nome}! 🔥 *Seu pedido #{p.id} está sendo preparado* com todo capricho na chapa! 🍔",
+        "Saiu para Entrega": f"Olá {p.cliente_nome}! 🛵 *Seu pedido #{p.id} saiu para entrega!* Já já chega aí! 🍔🔥"
+    }
+    if novo_status in msgs:
+        enviar_whatsapp_automatico(p.cliente_whatsapp, msgs[novo_status])
+
     return jsonify({"sucesso": True})
 
 
@@ -453,6 +558,11 @@ def atualizar_pagamento(pedido_id):
     d = request.json or {}
     if "status_pagamento" in d:
         p.status_pagamento = d["status_pagamento"]
+        if d["status_pagamento"] == "Pago":
+            enviar_whatsapp_automatico(
+                p.cliente_whatsapp,
+                f"Olá {p.cliente_nome}! ✅ *Pagamento realizado com sucesso!* Recebemos a confirmação do seu pedido #{p.id} na {NOME_LOJA} 🍔"
+            )
     if "link_pagamento" in d:
         p.link_pagamento = d["link_pagamento"].strip()
     db.session.commit()
