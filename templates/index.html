@@ -13,17 +13,27 @@
         body { background: var(--bg); color: var(--texto); padding-bottom: 95px; }
 
         header {
-            background: linear-gradient(180deg, #1f1a08 0%, var(--bg) 100%);
-            border-bottom: 2px solid var(--amarelo); padding: 20px 16px; text-align: center;
+            background: radial-gradient(circle at top, #292105 0%, #000000 75%);
+            border-bottom: 3px solid var(--amarelo);
+            padding: 24px 16px 20px;
+            text-align: center;
         }
-        .logo-badge {
-            display: inline-block; border: 3px solid var(--amarelo); border-radius: 50%;
-            width: 78px; height: 78px; line-height: 70px; font-size: 36px; background: #000; margin-bottom: 8px;
+        .logo-destaque {
+            width: 185px;
+            height: 185px;
+            object-fit: contain;
+            border-radius: 50%;
+            background: #000;
+            box-shadow: 0 0 28px rgba(255, 193, 7, 0.45);
+            margin-bottom: 10px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
         }
-        header h1 { color: var(--amarelo); font-size: 28px; letter-spacing: 1px; font-weight: 900; }
         .status-pill {
             display: inline-block; background: rgba(40, 167, 69, 0.2); color: #4cd964;
-            padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; margin-top: 6px;
+            padding: 5px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; margin-top: 4px;
+            border: 1px solid rgba(76, 217, 100, 0.35);
         }
 
         .categorias {
@@ -115,8 +125,7 @@
 <body>
 
 <header>
-    <div class="logo-badge">🍔</div>
-    <h1>{{ nome_loja }}</h1>
+    <img src="/logo" alt="{{ nome_loja }}" class="logo-destaque">
     <div class="status-pill">● Aberto para pedidos</div>
 </header>
 
@@ -169,7 +178,7 @@
         <input id="ckNome" placeholder="Ex: Poliana">
 
         <label>Seu WhatsApp (com DDD):</label>
-        <input id="ckWhats" placeholder="Ex: 65999998888" type="tel">
+        <input id="ckWhats" placeholder="Ex: 66999998888" type="tel">
 
         <label>Como deseja receber?</label>
         <div class="toggle-entrega">
@@ -228,7 +237,6 @@
         <div class="pag-badge" id="rasPagStatus">Pagamento: ...</div>
         <div class="status-destaque" id="rasStatus">Recebido</div>
 
-        <!-- Aparece automaticamente quando a loja colar o Link da Ton -->
         <a id="btnPagarLink" href="#" target="_blank" style="display:none; text-decoration:none;">
             <button class="btn-principal" style="background:#00a868; color:#fff; margin-top:4px;">💳 Abrir Link de Pagamento Agora</button>
         </a>
@@ -505,4 +513,3 @@
 </script>
 </body>
 </html>
-
