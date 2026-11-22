@@ -6,33 +6,19 @@
     <title>{{ nome_loja }} - Cardápio Digital</title>
     <style>
         :root {
-            --bg: #0e0e0e;
-            --card: #1a1a1a;
-            --amarelo: #ffc107;
-            --amarelo-hover: #e0a800;
-            --texto: #f5f5f5;
-            --cinza: #a0a0a0;
-            --verde: #28a745;
+            --bg: #0e0e0e; --card: #1a1a1a; --amarelo: #ffc107;
+            --texto: #f5f5f5; --cinza: #a0a0a0; --verde: #28a745;
         }
         * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; padding: 0; }
         body { background: var(--bg); color: var(--texto); padding-bottom: 95px; }
 
         header {
             background: linear-gradient(180deg, #1f1a08 0%, var(--bg) 100%);
-            border-bottom: 2px solid var(--amarelo);
-            padding: 20px 16px;
-            text-align: center;
+            border-bottom: 2px solid var(--amarelo); padding: 20px 16px; text-align: center;
         }
         .logo-badge {
-            display: inline-block;
-            border: 3px solid var(--amarelo);
-            border-radius: 50%;
-            width: 78px;
-            height: 78px;
-            line-height: 70px;
-            font-size: 36px;
-            background: #000;
-            margin-bottom: 8px;
+            display: inline-block; border: 3px solid var(--amarelo); border-radius: 50%;
+            width: 78px; height: 78px; line-height: 70px; font-size: 36px; background: #000; margin-bottom: 8px;
         }
         header h1 { color: var(--amarelo); font-size: 28px; letter-spacing: 1px; font-weight: 900; }
         .status-pill {
@@ -42,8 +28,7 @@
 
         .categorias {
             display: flex; gap: 8px; overflow-x: auto; padding: 14px 16px;
-            position: sticky; top: 0; background: var(--bg); z-index: 10;
-            border-bottom: 1px solid #262626;
+            position: sticky; top: 0; background: var(--bg); z-index: 10; border-bottom: 1px solid #262626;
         }
         .cat-btn {
             background: var(--card); color: var(--texto); border: 1px solid #333;
@@ -68,13 +53,11 @@
 
         .barra-carrinho {
             position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
-            width: calc(100% - 32px); max-width: 688px;
-            background: var(--amarelo); color: #000; padding: 14px 18px;
-            border-radius: 14px; display: none; justify-content: space-between; align-items: center;
-            font-weight: 800; cursor: pointer; box-shadow: 0 8px 25px rgba(255, 193, 7, 0.35); z-index: 20;
+            width: calc(100% - 32px); max-width: 688px; background: var(--amarelo); color: #000;
+            padding: 14px 18px; border-radius: 14px; display: none; justify-content: space-between;
+            align-items: center; font-weight: 800; cursor: pointer; box-shadow: 0 8px 25px rgba(255, 193, 7, 0.35); z-index: 20;
         }
 
-        /* Modais */
         .modal-bg {
             position: fixed; inset: 0; background: rgba(0,0,0,0.8);
             display: none; justify-content: center; align-items: flex-end; z-index: 50;
@@ -86,10 +69,7 @@
         .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
         .btn-fechar { background: #333; color: #fff; border: none; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 16px; }
 
-        .adicional-item {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 10px 0; border-bottom: 1px solid #2a2a2a;
-        }
+        .adicional-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #2a2a2a; }
         label { display: block; font-size: 13px; color: var(--cinza); margin: 10px 0 4px; }
         input, select, textarea {
             width: 100%; background: #101010; border: 1px solid #333; color: #fff;
@@ -97,8 +77,7 @@
         }
         .btn-principal {
             width: 100%; background: var(--amarelo); color: #000; border: none;
-            padding: 14px; border-radius: 10px; font-size: 16px; font-weight: 800;
-            cursor: pointer; margin-top: 16px;
+            padding: 14px; border-radius: 10px; font-size: 16px; font-weight: 800; cursor: pointer; margin-top: 16px;
         }
         .btn-secundario {
             background: #2b2b2b; color: #fff; border: 1px solid #444;
@@ -114,16 +93,22 @@
         }
         .opt-btn.ativo { border-color: var(--amarelo); background: rgba(255, 193, 7, 0.15); color: var(--amarelo); }
 
-        .box-pix {
+        .box-info {
             background: #112214; border: 1px solid var(--verde); padding: 12px;
-            border-radius: 10px; margin-top: 10px; font-size: 13px;
+            border-radius: 10px; margin-top: 10px; font-size: 13px; line-height: 1.4;
         }
-        .rastreio-box {
-            text-align: center; padding: 20px 10px;
+        .box-link-info {
+            background: #1c190a; border: 1px solid var(--amarelo); padding: 12px;
+            border-radius: 10px; margin-top: 10px; font-size: 13px; color: #ffe082; display: none;
         }
+        .rastreio-box { text-align: center; padding: 20px 10px; }
         .status-destaque {
-            font-size: 22px; font-weight: 900; color: var(--amarelo);
-            background: #26200a; padding: 14px; border-radius: 12px; margin: 14px 0;
+            font-size: 20px; font-weight: 900; color: var(--amarelo);
+            background: #26200a; padding: 12px; border-radius: 12px; margin: 12px 0;
+        }
+        .pag-badge {
+            display: inline-block; padding: 6px 14px; border-radius: 20px;
+            font-weight: bold; font-size: 13px; background: #2b2b2b; margin-bottom: 10px;
         }
     </style>
 </head>
@@ -138,14 +123,13 @@
 <div class="categorias" id="barraCategorias"></div>
 <div class="container" id="listaProdutos">Carregando cardápio...</div>
 
-<!-- Barra flutuante do carrinho -->
 <div class="barra-carrinho" id="barraCarrinho" onclick="abrirCheckout()">
     <span id="qtdCarrinho">0 itens</span>
     <span>Ver Carrinho →</span>
     <span id="totalCarrinho">R$ 0,00</span>
 </div>
 
-<!-- Modal de Detalhes do Produto -->
+<!-- Modal Produto -->
 <div class="modal-bg" id="modalProduto">
     <div class="modal-box">
         <div class="modal-header">
@@ -171,7 +155,7 @@
     </div>
 </div>
 
-<!-- Modal de Carrinho / Finalizar Pedido -->
+<!-- Modal Checkout -->
 <div class="modal-bg" id="modalCheckout">
     <div class="modal-box">
         <div class="modal-header">
@@ -203,14 +187,19 @@
 
         <label>Forma de Pagamento:</label>
         <select id="ckPagamento" onchange="mudarPagamento()">
-            <option value="Pix">Pix</option>
-            <option value="Cartão na entrega">Cartão na entrega (Crédito / Débito)</option>
+            <option value="Pix">Pix (Pagar agora)</option>
+            <option value="Cartão Online (Link)">Cartão Online (Link de Pagamento)</option>
+            <option value="Cartão na entrega">Cartão na entrega (Motoboy leva maquininha)</option>
             <option value="Dinheiro">Dinheiro</option>
         </select>
 
-        <div id="areaPix" class="box-pix">
+        <div id="areaPix" class="box-info">
             Chave Pix: <strong id="textoChavePix"></strong>
             <button class="btn-secundario" style="margin-left: 8px;" onclick="copiarPix()">Copiar Pix</button>
+        </div>
+
+        <div id="areaLinkInfo" class="box-link-info">
+            💳 Assim que você confirmar, vamos gerar seu <strong>Link de Pagamento seguro</strong> e liberar o botão aqui na tela e no seu WhatsApp!
         </div>
 
         <div id="areaTroco" style="display:none;">
@@ -230,12 +219,20 @@
     </div>
 </div>
 
-<!-- Modal de Acompanhamento ao Vivo -->
+<!-- Modal Acompanhamento ao Vivo -->
 <div class="modal-bg" id="modalRastreio">
     <div class="modal-box rastreio-box">
         <h2>Pedido #<span id="rasId"></span> Recebido! 🎉</h2>
-        <p style="color:var(--cinza); margin-top:6px;">Acompanhe o status do seu lanche em tempo real:</p>
+        <p style="color:var(--cinza); margin:6px 0 10px;">Acompanhe em tempo real:</p>
+
+        <div class="pag-badge" id="rasPagStatus">Pagamento: ...</div>
         <div class="status-destaque" id="rasStatus">Recebido</div>
+
+        <!-- Aparece automaticamente quando a loja colar o Link da Ton -->
+        <a id="btnPagarLink" href="#" target="_blank" style="display:none; text-decoration:none;">
+            <button class="btn-principal" style="background:#00a868; color:#fff; margin-top:4px;">💳 Abrir Link de Pagamento Agora</button>
+        </a>
+
         <button class="btn-principal" style="background:#25D366; color:#fff;" onclick="abrirWhatsLoja()">💬 Enviar resumo no WhatsApp</button>
         <button class="btn-secundario" style="margin-top:12px; width:100%;" onclick="fecharModal('modalRastreio')">Voltar ao Cardápio</button>
     </div>
@@ -274,17 +271,10 @@
         ).join("");
     }
 
-    function filtrarCat(cat) {
-        categoriaAtual = cat;
-        renderizarCategorias();
-        renderizarProdutos();
-    }
+    function filtrarCat(cat) { categoriaAtual = cat; renderizarCategorias(); renderizarProdutos(); }
 
     function renderizarProdutos() {
-        const lista = categoriaAtual === "Todos"
-            ? DADOS.produtos
-            : DADOS.produtos.filter(p => p.categoria === categoriaAtual);
-
+        const lista = categoriaAtual === "Todos" ? DADOS.produtos : DADOS.produtos.filter(p => p.categoria === categoriaAtual);
         document.getElementById("listaProdutos").innerHTML = lista.map(p => `
             <div class="prod-card" onclick="abrirProduto(${p.id})">
                 <div class="prod-info">
@@ -328,15 +318,12 @@
 
     function obterAdicionaisMarcados() {
         const marcados = [];
-        document.querySelectorAll(".chk-ad:checked").forEach(el => {
-            marcados.push(DADOS.adicionais[el.dataset.idx]);
-        });
+        document.querySelectorAll(".chk-ad:checked").forEach(el => marcados.push(DADOS.adicionais[el.dataset.idx]));
         return marcados;
     }
 
     function atualizarBtnProduto() {
-        const ads = obterAdicionaisMarcados();
-        const somaAds = ads.reduce((acc, a) => acc + a.preco, 0);
+        const somaAds = obterAdicionaisMarcados().reduce((acc, a) => acc + a.preco, 0);
         const total = (produtoSelecionado.preco + somaAds) * qtdSelecionada;
         document.getElementById("mpBtnAdd").innerText = `Adicionar • ${fmt(total)}`;
     }
@@ -344,26 +331,20 @@
     function confirmarAddCarrinho() {
         const ads = obterAdicionaisMarcados();
         const somaAds = ads.reduce((acc, a) => acc + a.preco, 0);
-        const totalItem = (produtoSelecionado.preco + somaAds) * qtdSelecionada;
-
         carrinho.push({
             nome: produtoSelecionado.nome,
             qtd: qtdSelecionada,
             adicionais: ads,
             obs: document.getElementById("mpObs").value.trim(),
-            total_item: totalItem
+            total_item: (produtoSelecionado.preco + somaAds) * qtdSelecionada
         });
-
         fecharModal("modalProduto");
         atualizarBarraCarrinho();
     }
 
     function atualizarBarraCarrinho() {
         const barra = document.getElementById("barraCarrinho");
-        if (carrinho.length === 0) {
-            barra.style.display = "none";
-            return;
-        }
+        if (carrinho.length === 0) { barra.style.display = "none"; return; }
         const totalQtd = carrinho.reduce((acc, i) => acc + i.qtd, 0);
         const sub = carrinho.reduce((acc, i) => acc + i.total_item, 0);
         document.getElementById("qtdCarrinho").innerText = `${totalQtd} ${totalQtd === 1 ? 'item' : 'itens'}`;
@@ -374,6 +355,7 @@
     function abrirCheckout() {
         renderizarItensCheckout();
         atualizarResumoCheckout();
+        mudarPagamento();
         document.getElementById("modalCheckout").style.display = "flex";
     }
 
@@ -411,6 +393,7 @@
     function mudarPagamento() {
         const pag = document.getElementById("ckPagamento").value;
         document.getElementById("areaPix").style.display = pag === "Pix" ? "block" : "none";
+        document.getElementById("areaLinkInfo").style.display = pag === "Cartão Online (Link)" ? "block" : "none";
         document.getElementById("areaTroco").style.display = pag === "Dinheiro" ? "block" : "none";
     }
 
@@ -489,6 +472,25 @@
         if (r.ok) {
             const p = await r.json();
             document.getElementById("rasStatus").innerText = p.status;
+
+            const badge = document.getElementById("rasPagStatus");
+            if (p.status_pagamento === "Pago") {
+                badge.innerText = "✅ Pagamento Aprovado";
+                badge.style.background = "#144d25";
+                badge.style.color = "#4cd964";
+            } else {
+                badge.innerText = "💳 " + p.status_pagamento;
+                badge.style.background = "#332a0a";
+                badge.style.color = "#ffc107";
+            }
+
+            const btnLink = document.getElementById("btnPagarLink");
+            if (p.link_pagamento && p.status_pagamento !== "Pago") {
+                btnLink.href = p.link_pagamento;
+                btnLink.style.display = "block";
+            } else {
+                btnLink.style.display = "none";
+            }
         }
     }
 
