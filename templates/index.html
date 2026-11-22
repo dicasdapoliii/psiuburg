@@ -71,6 +71,16 @@
             align-items: center; font-weight: 800; cursor: pointer; box-shadow: 0 8px 25px rgba(255, 193, 7, 0.35); z-index: 20;
         }
 
+        footer {
+            text-align: center; padding: 28px 16px 20px; color: #666; font-size: 12px;
+            border-top: 1px solid #1f1f1f; margin-top: 30px;
+        }
+        .link-admin {
+            display: inline-block; margin-top: 8px; color: #888; text-decoration: none;
+            border: 1px solid #2c2c2c; padding: 6px 14px; border-radius: 20px; font-size: 12px;
+        }
+        .link-admin:hover { color: var(--amarelo); border-color: var(--amarelo); }
+
         .modal-bg {
             position: fixed; inset: 0; background: rgba(0,0,0,0.8);
             display: none; justify-content: center; align-items: flex-end; z-index: 50;
@@ -122,14 +132,14 @@
             background: #1c190a; border: 1px solid var(--amarelo); padding: 12px;
             border-radius: 10px; margin-top: 10px; font-size: 13px; color: #ffe082; display: none;
         }
-        .rastreio-box { text-align: center; padding: 20px 10px; }
+        .rastreio-box { text-align: center; padding: 18px 10px; }
         .status-destaque {
-            font-size: 20px; font-weight: 900; color: var(--amarelo);
-            background: #26200a; padding: 12px; border-radius: 12px; margin: 12px 0;
+            font-size: 18px; font-weight: 900; color: var(--amarelo);
+            background: #26200a; padding: 14px; border-radius: 12px; margin: 12px 0;
         }
         .pag-badge {
             display: inline-block; padding: 6px 14px; border-radius: 20px;
-            font-weight: bold; font-size: 13px; background: #2b2b2b; margin-bottom: 10px;
+            font-weight: bold; font-size: 13px; background: #2b2b2b; margin-bottom: 6px;
         }
         .hist-card {
             background: #121212; border: 1px solid #2c2c2c; border-radius: 10px;
@@ -165,6 +175,11 @@
 <div class="categorias" id="barraCategorias"></div>
 <div class="container" id="listaProdutos">Carregando cardápio...</div>
 
+<footer>
+    <div>© {{ nome_loja }} — Rondonópolis, MT</div>
+    <a href="/painel" class="link-admin">🔐 Área do Administrador</a>
+</footer>
+
 <div class="barra-carrinho" id="barraCarrinho" onclick="abrirCheckout()">
     <span id="qtdCarrinho">0 itens</span>
     <span>Ver Carrinho →</span>
@@ -179,7 +194,6 @@
             <button class="btn-fechar" onclick="fecharModal('modalConta')">✕</button>
         </div>
 
-        <!-- TELA 1: LOGIN -->
         <div id="telaLogin">
             <p style="font-size:13px; color:var(--cinza); margin-bottom:12px;">
                 Digite seu WhatsApp para entrar e puxar seu endereço e histórico de pedidos.
@@ -187,86 +201,60 @@
             <label>Seu WhatsApp (com DDD):</label>
             <input id="loginWhats" placeholder="Ex: 66999998888" type="tel">
             <button class="btn-principal" onclick="fazerLogin()">Entrar</button>
-
             <div class="link-troca">
                 Ainda não possui cadastro? <a onclick="mostrarTelaConta('cadastro')">Cadastre-se aqui</a>
             </div>
         </div>
 
-        <!-- TELA 2: CADASTRO -->
         <div id="telaCadastro" style="display:none;">
             <p style="font-size:13px; color:var(--cinza); margin-bottom:6px;">
                 Preencha uma única vez para agilizar seus próximos pedidos!
             </p>
-            <label>Seu Nome:</label>
-            <input id="cadNome" placeholder="Ex: Poliana">
-
+            <label>Seu Nome Completo:</label>
+            <input id="cadNome" placeholder="Ex: Poliana Nunes">
+            <label>Seu CPF:</label>
+            <input id="cadCpf" placeholder="000.000.000-00" maxlength="14" oninput="mascaraCPF(this)">
             <label>Seu WhatsApp (com DDD):</label>
             <input id="cadWhats" placeholder="Ex: 66999998888" type="tel">
-
             <label>CEP (preenche rua e bairro sozinho):</label>
             <input id="cadCep" placeholder="Ex: 78700-000" maxlength="9" onblur="buscarCep('cad')">
-
             <div class="grid-2">
-                <div>
-                    <label>Rua / Avenida:</label>
-                    <input id="cadRua" placeholder="Nome da rua">
-                </div>
-                <div>
-                    <label>Número:</label>
-                    <input id="cadNumero" placeholder="Ex: 123">
-                </div>
+                <div><label>Rua / Avenida:</label><input id="cadRua" placeholder="Nome da rua"></div>
+                <div><label>Número:</label><input id="cadNumero" placeholder="Ex: 123"></div>
             </div>
-
             <label>Bairro:</label>
             <input id="cadBairro" placeholder="Ex: Jardim Rondônia">
-
             <label>Complemento / Ponto de Referência (opcional):</label>
             <input id="cadComp" placeholder="Ex: Casa 2, portão preto">
-
             <button class="btn-gps" id="btnGpsCad" onclick="capturarGPS('cad')">📍 Usar minha localização atual (GPS)</button>
             <button class="btn-principal" onclick="salvarCadastro()">✅ Criar meu cadastro</button>
-
             <div class="link-troca">
                 Já possui cadastro? <a onclick="mostrarTelaConta('login')">Fazer login</a>
             </div>
         </div>
 
-        <!-- TELA 3: LOGADO (PERFIL + HISTÓRICO) -->
         <div id="telaPerfil" style="display:none;">
             <label>Seu Nome:</label>
             <input id="perfNome">
-
+            <label>Seu CPF:</label>
+            <input id="perfCpf" placeholder="000.000.000-00" maxlength="14" oninput="mascaraCPF(this)">
             <label>Seu WhatsApp:</label>
             <input id="perfWhats" readonly style="opacity:0.7;">
-
             <label>CEP:</label>
             <input id="perfCep" maxlength="9" onblur="buscarCep('perf')">
-
             <div class="grid-2">
-                <div>
-                    <label>Rua / Avenida:</label>
-                    <input id="perfRua">
-                </div>
-                <div>
-                    <label>Número:</label>
-                    <input id="perfNumero">
-                </div>
+                <div><label>Rua / Avenida:</label><input id="perfRua"></div>
+                <div><label>Número:</label><input id="perfNumero"></div>
             </div>
-
             <label>Bairro:</label>
             <input id="perfBairro">
-
             <label>Complemento / Referência:</label>
             <input id="perfComp">
-
             <button class="btn-gps" id="btnGpsPerf" onclick="capturarGPS('perf')">📍 Atualizar localização atual (GPS)</button>
-
             <div style="display:flex; gap:8px; margin-top:14px;">
                 <button class="btn-principal" style="margin-top:0;" onclick="atualizarPerfil()">💾 Salvar Alterações</button>
                 <button class="btn-secundario" style="color:#ff5252; border-color:#ff5252;" onclick="sairConta()">Sair</button>
             </div>
-
             <div id="areaHistCliente" style="margin-top:20px;">
                 <h3 style="color:var(--amarelo); font-size:15px; margin-bottom:6px;">📋 Seus Últimos Pedidos</h3>
                 <div id="listaHistCliente"></div>
@@ -283,20 +271,16 @@
             <button class="btn-fechar" onclick="fecharModal('modalProduto')">✕</button>
         </div>
         <p id="mpDesc" style="color: var(--cinza); font-size: 14px; margin-bottom: 12px;"></p>
-
         <strong style="font-size: 14px;">Adicionais (opcional):</strong>
         <div id="mpAdicionais"></div>
-
         <label>Observações (ex: sem cebola, ponto da carne):</label>
         <textarea id="mpObs" rows="2" placeholder="Alguma observação?"></textarea>
-
         <div class="qtd-box">
             <span>Quantidade:</span>
             <button class="qtd-btn" onclick="mudarQtd(-1)">-</button>
             <strong id="mpQtd" style="font-size: 18px;">1</strong>
             <button class="qtd-btn" onclick="mudarQtd(1)">+</button>
         </div>
-
         <button class="btn-principal" id="mpBtnAdd" onclick="confirmarAddCarrinho()">Adicionar</button>
     </div>
 </div>
@@ -308,12 +292,10 @@
             <h2 style="color: var(--amarelo);">Seu Pedido</h2>
             <button class="btn-fechar" onclick="fecharModal('modalCheckout')">✕</button>
         </div>
-
         <div id="itensCheckout" style="margin-bottom: 14px;"></div>
 
         <label>Seu Nome:</label>
         <input id="ckNome" placeholder="Ex: Poliana">
-
         <label>Seu WhatsApp (com DDD):</label>
         <input id="ckWhats" placeholder="Ex: 66999998888" type="tel">
 
@@ -326,24 +308,14 @@
         <div id="areaEndereco">
             <label>CEP:</label>
             <input id="ckCep" placeholder="Ex: 78700-000" maxlength="9" onblur="buscarCep('ck')">
-
             <div class="grid-2">
-                <div>
-                    <label>Rua / Avenida:</label>
-                    <input id="ckRua" placeholder="Nome da rua" onblur="calcularFreteAtual()">
-                </div>
-                <div>
-                    <label>Número:</label>
-                    <input id="ckNumero" placeholder="Ex: 123" onblur="calcularFreteAtual()">
-                </div>
+                <div><label>Rua / Avenida:</label><input id="ckRua" placeholder="Nome da rua" onblur="calcularFreteAtual()"></div>
+                <div><label>Número:</label><input id="ckNumero" placeholder="Ex: 123" onblur="calcularFreteAtual()"></div>
             </div>
-
             <label>Bairro:</label>
             <input id="ckBairro" placeholder="Ex: Jardim Rondônia" onblur="calcularFreteAtual()">
-
             <label>Complemento / Ponto de Referência:</label>
             <input id="ckComp" placeholder="Ex: Casa amarela, próximo ao mercado">
-
             <button class="btn-gps" id="btnGpsCk" onclick="capturarGPS('ck')">📍 Usar minha localização atual (GPS)</button>
         </div>
 
@@ -392,20 +364,23 @@
     </div>
 </div>
 
-<!-- Modal Acompanhamento ao Vivo -->
+<!-- Modal Agradecimento e Acompanhamento ao Vivo -->
 <div class="modal-bg" id="modalRastreio">
     <div class="modal-box rastreio-box">
-        <h2>Pedido #<span id="rasId"></span> Recebido! 🎉</h2>
-        <p style="color:var(--cinza); margin:6px 0 10px;">Acompanhe em tempo real:</p>
+        <h2 style="color: var(--amarelo);">Obrigado pelo seu pedido! 🍔🎉</h2>
+        <p style="color:#e0e0e0; font-size:14px; margin:8px 0 12px; line-height:1.4;">
+            Pedido <strong>#<span id="rasId"></span></strong> registrado!<br>
+            Por gentileza, encaminhe o pedido ao nosso WhatsApp clicando no botão abaixo para acompanhar tudo em tempo real:
+        </p>
 
-        <div class="pag-badge" id="rasPagStatus">Pagamento: ...</div>
-        <div class="status-destaque" id="rasStatus">Recebido</div>
+        <div class="pag-badge" id="rasPagStatus">💳 Aguardando Pagamento</div>
+        <div class="status-destaque" id="rasStatus">📩 Pedido recebido! Aguardando confirmação...</div>
 
         <a id="btnPagarLink" href="#" target="_blank" style="display:none; text-decoration:none;">
             <button class="btn-principal" style="background:#00a868; color:#fff; margin-top:4px;">💳 Abrir Link de Pagamento Agora</button>
         </a>
 
-        <button class="btn-principal" style="background:#25D366; color:#fff;" onclick="abrirWhatsLoja()">💬 Enviar resumo no WhatsApp</button>
+        <button class="btn-principal" style="background:#25D366; color:#fff;" onclick="abrirWhatsLoja()">💬 Encaminhar Pedido no WhatsApp</button>
         <button class="btn-secundario" style="margin-top:12px; width:100%;" onclick="fecharModal('modalRastreio')">Voltar ao Cardápio</button>
     </div>
 </div>
@@ -420,7 +395,6 @@
     let ultimoPedido = null;
     let timerRastreio = null;
 
-    // Estado de geolocalizacao e frete calculado
     let gpsLat = null;
     let gpsLng = null;
     let taxaCalculada = 0.0;
@@ -428,6 +402,24 @@
     let linkMapsCalculado = "";
 
     const fmt = v => "R$ " + Number(v).toFixed(2).replace(".", ",");
+
+    const MENSAGENS_STATUS = {
+        "Recebido": "📩 Pedido recebido! Aguardando confirmação...",
+        "Aceito": "👍 Seu pedido foi aceito!",
+        "Em Preparo": "🔥 Seu pedido está sendo preparado!",
+        "Na Chapa": "🔥 Seu pedido está sendo preparado!",
+        "Saiu para Entrega": "🛵 Seu pedido saiu para entrega!",
+        "Concluído": "🎉 Pedido entregue! Bom apetite!",
+        "Cancelado": "❌ Pedido cancelado."
+    };
+
+    function mascaraCPF(el) {
+        let v = el.value.replace(/\D/g, "").slice(0, 11);
+        v = v.replace(/(\d{3})(\d)/, "$1.$2");
+        v = v.replace(/(\d{3})(\d)/, "$1.$2");
+        v = v.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+        el.value = v;
+    }
 
     async function carregarCardapio() {
         const r = await fetch("/api/dados");
@@ -456,7 +448,6 @@
         if (!navigator.geolocation) return alert("Seu navegador não suporta geolocalização.");
         const btn = document.getElementById("btnGps" + prefixo.charAt(0).toUpperCase() + prefixo.slice(1));
         btn.innerText = "⏳ Obtendo sua localização...";
-
         navigator.geolocation.getCurrentPosition(
             pos => {
                 gpsLat = pos.coords.latitude;
@@ -474,19 +465,11 @@
     }
 
     async function calcularFreteAtual() {
-        if (tipoEntrega === "Retirada") {
-            taxaCalculada = 0;
-            atualizarResumoCheckout();
-            return;
-        }
+        if (tipoEntrega === "Retirada") { taxaCalculada = 0; atualizarResumoCheckout(); return; }
         const rua = document.getElementById("ckRua").value.trim();
         const numero = document.getElementById("ckNumero").value.trim();
         const bairro = document.getElementById("ckBairro").value.trim();
-
-        if (!rua && gpsLat === null) {
-            document.getElementById("resTaxa").innerText = "Informe o endereço";
-            return;
-        }
+        if (!rua && gpsLat === null) { document.getElementById("resTaxa").innerText = "Informe o endereço"; return; }
 
         document.getElementById("resTaxa").innerText = "Calculando...";
         const r = await fetch("/api/calcular-frete", {
@@ -504,18 +487,13 @@
     }
 
     function obterClienteSalvo() {
-        try {
-            const salvo = localStorage.getItem("psiuburg_cliente");
-            return salvo ? JSON.parse(salvo) : null;
-        } catch (e) { return null; }
+        try { const s = localStorage.getItem("psiuburg_cliente"); return s ? JSON.parse(s) : null; }
+        catch (e) { return null; }
     }
 
     function carregarClienteLocal() {
         const c = obterClienteSalvo();
-        if (!c) {
-            document.getElementById("btnMinhaConta").innerText = "👤 Fazer Login";
-            return;
-        }
+        if (!c) { document.getElementById("btnMinhaConta").innerText = "👤 Fazer Login"; return; }
         document.getElementById("ckNome").value = c.nome || "";
         document.getElementById("ckWhats").value = c.whatsapp || "";
         document.getElementById("ckCep").value = c.cep || "";
@@ -538,18 +516,16 @@
     function abrirModalConta() {
         const c = obterClienteSalvo();
         if (c && c.whatsapp) {
-            preencherTelaPerfil(c);
-            mostrarTelaConta("perfil");
-            carregarHistoricoCliente(c.whatsapp);
+            preencherTelaPerfil(c); mostrarTelaConta("perfil"); carregarHistoricoCliente(c.whatsapp);
         } else {
-            document.getElementById("loginWhats").value = "";
-            mostrarTelaConta("login");
+            document.getElementById("loginWhats").value = ""; mostrarTelaConta("login");
         }
         document.getElementById("modalConta").style.display = "flex";
     }
 
     function preencherTelaPerfil(c) {
         document.getElementById("perfNome").value = c.nome || "";
+        document.getElementById("perfCpf").value = c.cpf || "";
         document.getElementById("perfWhats").value = c.whatsapp || "";
         document.getElementById("perfCep").value = c.cep || "";
         document.getElementById("perfRua").value = c.rua || "";
@@ -561,30 +537,24 @@
     async function fazerLogin() {
         const whats = document.getElementById("loginWhats").value.trim();
         if (!whats) return alert("Digite seu WhatsApp para entrar!");
-
         const r = await fetch("/api/clientes/buscar", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+            method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ whatsapp: whats })
         });
         const d = await r.json();
         if (d.encontrado) {
             localStorage.setItem("psiuburg_cliente", JSON.stringify(d.cliente));
-            carregarClienteLocal();
-            preencherTelaPerfil(d.cliente);
-            renderizarHistorico(d.pedidos);
+            carregarClienteLocal(); preencherTelaPerfil(d.cliente); renderizarHistorico(d.pedidos);
             mostrarTelaConta("perfil");
         } else {
             alert("Ainda não encontramos um cadastro com esse número. Vamos criar o seu agora!");
-            document.getElementById("cadWhats").value = whats;
-            mostrarTelaConta("cadastro");
+            document.getElementById("cadWhats").value = whats; mostrarTelaConta("cadastro");
         }
     }
 
     async function carregarHistoricoCliente(whats) {
         const r = await fetch("/api/clientes/buscar", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+            method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ whatsapp: whats })
         });
         const d = await r.json();
@@ -614,6 +584,7 @@
         const payload = {
             whatsapp: document.getElementById("cadWhats").value.trim(),
             nome: document.getElementById("cadNome").value.trim(),
+            cpf: document.getElementById("cadCpf").value.trim(),
             cep: document.getElementById("cadCep").value.trim(),
             rua: document.getElementById("cadRua").value.trim(),
             numero: document.getElementById("cadNumero").value.trim(),
@@ -621,18 +592,17 @@
             complemento: document.getElementById("cadComp").value.trim(),
             lat: gpsLat, lng: gpsLng
         };
-        if (!payload.nome || !payload.whatsapp) return alert("Preencha seu nome e WhatsApp!");
-
+        if (!payload.nome || !payload.whatsapp || payload.cpf.replace(/\D/g, "").length !== 11) {
+            return alert("Por favor, preencha Nome Completo, CPF válido (11 dígitos) e WhatsApp!");
+        }
         const r = await fetch("/api/clientes/salvar", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+            method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
         });
         const d = await r.json();
         if (d.sucesso) {
             localStorage.setItem("psiuburg_cliente", JSON.stringify(d.cliente));
-            carregarClienteLocal();
-            alert("Cadastro criado com sucesso! Bem-vindo(a) à PSIU! BURG!");
+            carregarClienteLocal(); alert("Cadastro criado com sucesso! Bem-vindo(a) à PSIU! BURG!");
             fecharModal("modalConta");
         }
     }
@@ -641,6 +611,7 @@
         const payload = {
             whatsapp: document.getElementById("perfWhats").value.trim(),
             nome: document.getElementById("perfNome").value.trim(),
+            cpf: document.getElementById("perfCpf").value.trim(),
             cep: document.getElementById("perfCep").value.trim(),
             rua: document.getElementById("perfRua").value.trim(),
             numero: document.getElementById("perfNumero").value.trim(),
@@ -649,15 +620,13 @@
             lat: gpsLat, lng: gpsLng
         };
         const r = await fetch("/api/clientes/salvar", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+            method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
         });
         const d = await r.json();
         if (d.sucesso) {
             localStorage.setItem("psiuburg_cliente", JSON.stringify(d.cliente));
-            carregarClienteLocal();
-            alert("Dados atualizados com sucesso!");
+            carregarClienteLocal(); alert("Dados atualizados com sucesso!");
         }
     }
 
@@ -665,8 +634,7 @@
         localStorage.removeItem("psiuburg_cliente");
         gpsLat = null; gpsLng = null;
         ["ckNome","ckWhats","ckCep","ckRua","ckNumero","ckBairro","ckComp"].forEach(id => document.getElementById(id).value = "");
-        carregarClienteLocal();
-        fecharModal("modalConta");
+        carregarClienteLocal(); fecharModal("modalConta");
     }
 
     function renderizarCategorias() {
@@ -699,7 +667,6 @@
         document.getElementById("mpDesc").innerText = produtoSelecionado.descricao || "";
         document.getElementById("mpObs").value = "";
         document.getElementById("mpQtd").innerText = "1";
-
         const mostrarAds = produtoSelecionado.categoria !== "Bebidas";
         document.getElementById("mpAdicionais").innerHTML = mostrarAds ? DADOS.adicionais.map((a, idx) => `
             <div class="adicional-item">
@@ -710,7 +677,6 @@
                 <span style="color:var(--amarelo); font-weight:bold;">+ ${fmt(a.preco)}</span>
             </div>
         `).join("") : "<p style='color:var(--cinza); font-size:13px;'>Sem adicionais para bebidas.</p>";
-
         atualizarBtnProduto();
         document.getElementById("modalProduto").style.display = "flex";
     }
@@ -737,14 +703,11 @@
         const ads = obterAdicionaisMarcados();
         const somaAds = ads.reduce((acc, a) => acc + a.preco, 0);
         carrinho.push({
-            nome: produtoSelecionado.nome,
-            qtd: qtdSelecionada,
-            adicionais: ads,
+            nome: produtoSelecionado.nome, qtd: qtdSelecionada, adicionais: ads,
             obs: document.getElementById("mpObs").value.trim(),
             total_item: (produtoSelecionado.preco + somaAds) * qtdSelecionada
         });
-        fecharModal("modalProduto");
-        atualizarBarraCarrinho();
+        fecharModal("modalProduto"); atualizarBarraCarrinho();
     }
 
     function atualizarBarraCarrinho() {
@@ -758,8 +721,7 @@
     }
 
     function abrirCheckout() {
-        renderizarItensCheckout();
-        mudarPagamento();
+        renderizarItensCheckout(); mudarPagamento();
         document.getElementById("modalCheckout").style.display = "flex";
         calcularFreteAtual();
     }
@@ -781,8 +743,7 @@
     }
 
     function removerItem(idx) {
-        carrinho.splice(idx, 1);
-        atualizarBarraCarrinho();
+        carrinho.splice(idx, 1); atualizarBarraCarrinho();
         if (carrinho.length === 0) fecharModal("modalCheckout");
         else { renderizarItensCheckout(); atualizarResumoCheckout(); }
     }
@@ -803,10 +764,7 @@
         document.getElementById("areaTroco").style.display = pag === "Dinheiro" ? "block" : "none";
     }
 
-    function copiarPix() {
-        navigator.clipboard.writeText(DADOS.chave_pix);
-        alert("Chave Pix copiada!");
-    }
+    function copiarPix() { navigator.clipboard.writeText(DADOS.chave_pix); alert("Chave Pix copiada!"); }
 
     function atualizarResumoCheckout() {
         const subtotal = carrinho.reduce((acc, i) => acc + i.total_item, 0);
@@ -824,15 +782,13 @@
         const numero = document.getElementById("ckNumero").value.trim();
         const bairro = document.getElementById("ckBairro").value.trim();
         const comp = document.getElementById("ckComp").value.trim();
+        const cSalvo = obterClienteSalvo() || {};
 
         if (!nome || !whats) return alert("Por favor, preencha seu nome e WhatsApp.");
         if (tipoEntrega === "Entrega" && (!rua || !numero || !bairro)) {
             return alert("Por favor, preencha Rua, Número e Bairro para entrega.");
         }
-
-        if (tipoEntrega === "Entrega" && taxaCalculada === 0) {
-            await calcularFreteAtual();
-        }
+        if (tipoEntrega === "Entrega" && taxaCalculada === 0) await calcularFreteAtual();
 
         const subtotal = carrinho.reduce((acc, i) => acc + i.total_item, 0);
         const taxa = tipoEntrega === "Retirada" ? 0 : taxaCalculada;
@@ -841,34 +797,26 @@
             : "Retirada no Balcão";
 
         const payload = {
-            cliente_nome: nome, cliente_whatsapp: whats,
-            tipo_entrega: tipoEntrega,
-            cep, rua, numero, bairro, complemento: comp,
-            endereco: enderecoFmt,
-            lat: gpsLat, lng: gpsLng,
-            link_maps: linkMapsCalculado,
-            distancia_km: distanciaCalculada,
+            cliente_nome: nome, cpf: cSalvo.cpf || "", cliente_whatsapp: whats, tipo_entrega: tipoEntrega,
+            cep, rua, numero, bairro, complemento: comp, endereco: enderecoFmt,
+            lat: gpsLat, lng: gpsLng, link_maps: linkMapsCalculado, distancia_km: distanciaCalculada,
             forma_pagamento: document.getElementById("ckPagamento").value,
             troco_para: document.getElementById("ckTroco").value.trim(),
             itens: carrinho, subtotal, taxa_entrega: taxa, total: subtotal + taxa
         };
 
         const r = await fetch("/api/pedidos", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+            method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
         });
         const res = await r.json();
         if (res.sucesso) {
             ultimoPedido = res.pedido;
             localStorage.setItem("psiuburg_cliente", JSON.stringify({
-                nome, whatsapp: whats, cep, rua, numero, bairro, complemento: comp, lat: gpsLat, lng: gpsLng
+                nome, cpf: cSalvo.cpf || "", whatsapp: whats, cep, rua, numero, bairro, complemento: comp, lat: gpsLat, lng: gpsLng
             }));
-            carregarClienteLocal();
-            carrinho = [];
-            atualizarBarraCarrinho();
-            fecharModal("modalCheckout");
-            abrirRastreio(ultimoPedido.id);
+            carregarClienteLocal(); carrinho = []; atualizarBarraCarrinho();
+            fecharModal("modalCheckout"); abrirRastreio(ultimoPedido.id);
         }
     }
 
@@ -886,11 +834,11 @@
         if (r.ok) {
             const p = await r.json();
             ultimoPedido = p;
-            document.getElementById("rasStatus").innerText = p.status;
+            document.getElementById("rasStatus").innerText = MENSAGENS_STATUS[p.status] || p.status;
 
             const badge = document.getElementById("rasPagStatus");
             if (p.status_pagamento === "Pago") {
-                badge.innerText = "✅ Pagamento Aprovado";
+                badge.innerText = "✅ Pagamento realizado com sucesso!";
                 badge.style.background = "#144d25";
                 badge.style.color = "#4cd964";
             } else {
@@ -901,8 +849,7 @@
 
             const btnLink = document.getElementById("btnPagarLink");
             if (p.link_pagamento && p.status_pagamento !== "Pago") {
-                btnLink.href = p.link_pagamento;
-                btnLink.style.display = "block";
+                btnLink.href = p.link_pagamento; btnLink.style.display = "block";
             } else {
                 btnLink.style.display = "none";
             }
@@ -912,7 +859,6 @@
     function abrirWhatsLoja() {
         if (!ultimoPedido) return;
         const p = ultimoPedido;
-
         let listaItens = p.itens.map(it => {
             let linha = `▪ *${it.qtd}x ${it.nome}* (${fmt(it.total_item)})`;
             if (it.adicionais && it.adicionais.length) linha += `\n   + ${it.adicionais.map(a => a.nome).join(", ")}`;
@@ -923,7 +869,6 @@
         let blocoEntrega = p.tipo_entrega === "Entrega"
             ? `🛵 *Entrega:* ${p.endereco}` + (p.link_maps ? `\n📍 *Localização:* ${p.link_maps}` : "")
             : `🏪 *Retirada no Balcão (Grátis)*`;
-
         let blocoTroco = p.troco_para ? `\n💵 *Troco para:* R$ ${p.troco_para}` : "";
 
         const texto =
