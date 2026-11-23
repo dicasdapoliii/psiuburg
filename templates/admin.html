@@ -49,10 +49,10 @@
         .btn-cinza { background: #333; color: #fff; }
         .btn-vermelho { background: var(--vermelho); color: #fff; }
 
-        .opcoes-barra { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; align-items: center; }
+        .opcoes-barra { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; align-items: flex-start; }
         .chk-whats-bar {
-            background: #14281b; border: 1px solid #28a745; padding: 8px 14px;
-            border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;
+            background: #14281b; border: 1px solid #28a745; padding: 10px 14px;
+            border-radius: 10px; display: inline-flex; align-items: flex-start; gap: 10px; font-size: 13px; cursor: pointer; line-height: 1.45;
         }
         .chk-auto-bar {
             background: #2b2208; border: 1px solid var(--amarelo); padding: 8px 14px;
@@ -60,7 +60,7 @@
         }
         .box-tempo-alerta {
             background: #102530; border: 1px solid var(--azul); padding: 6px 12px;
-            border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #b2ebf2;
+            border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #b2ebf2; flex-wrap: wrap;
         }
         .box-tempo-alerta input {
             width: 56px; padding: 4px 6px; background: #0d161b; border: 1px solid var(--azul);
@@ -108,6 +108,14 @@
         }
         .mini-foto-adm { width: 46px; height: 46px; border-radius: 8px; object-fit: cover; border: 1px solid #333; }
 
+        .filtros-fin {
+            display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+            background: var(--card); padding: 12px; border-radius: 12px; border: 1px solid #333;
+        }
+        .filtros-fin input[type="month"] {
+            background: #111; color: #fff; border: 1px solid #444; padding: 8px 10px; border-radius: 8px;
+        }
+
         .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 14px 0 20px; }
         .kpi-card { background: var(--card); border: 1px solid #333; border-radius: 12px; padding: 16px; }
         .kpi-card small { color: #aaa; font-size: 12px; }
@@ -138,7 +146,7 @@
         <button id="btnStatusLoja" class="btn-verde" onclick="alternarStatusLoja()">🟢 Iniciar Expediente</button>
         <span id="infoExpediente" class="info-expediente" style="display:none;"></span>
         <button id="btnSom" class="btn-verde" onclick="alternarSom()">🔊 Voz & Som Ativos</button>
-        <button class="btn-cinza" onclick="carregarPedidos()">🔄 Atualizar</button>
+        <button class="btn-cinza" onclick="carregarPedidos()" title="Atualiza sozinho a cada 5s; clique se quiser forçar agora">🔄 Atualizar</button>
         <a href="/" target="_blank"><button class="btn-amarelo">📱 Ver Cardápio</button></a>
     </div>
 </div>
@@ -150,21 +158,24 @@
     </label>
 
     <div class="box-tempo-alerta">
-        <span>🔁 Lembrar pedido pendente a cada</span>
+        <span>🔁 Lembrar pedido pendente de aceite a cada</span>
         <input type="number" id="inputMinutosAlerta" min="1" max="60" value="3" onchange="salvarTempoAlerta()">
         <span>min</span>
         <button class="btn-azul" style="padding:4px 8px; font-size:11px;" onclick="testarVoz()">🔊 Testar Voz</button>
     </div>
 
     <label class="chk-whats-bar">
-        <input type="checkbox" id="chkAutoWhats" style="width:auto;">
-        <span>💬 Abrir WhatsApp Web manualmente (deixe desmarcado para usar o Green-API)</span>
+        <input type="checkbox" id="chkAutoWhats" style="width:auto; margin-top:3px;">
+        <div>
+            <div>💬 <strong>Para abrir o WhatsApp Web e enviar mensagens manualmente ao cliente, deixe a caixinha marcada.</strong></div>
+            <div style="color:#a5d6a7; font-size:12px;">✅ Para envio automático ao aceitar o pedido, deixe a caixinha desmarcada.</div>
+        </div>
     </label>
 </div>
 
 <div class="abas">
     <button class="aba-btn ativa" id="tabPedidosBtn" onclick="trocarAba('pedidos')">📋 Pedidos ao Vivo</button>
-    <button class="aba-btn" id="tabFinanceiroBtn" onclick="trocarAba('financeiro')">💰 Fluxo de Caixa & Expediente</button>
+    <button class="aba-btn" id="tabFinanceiroBtn" onclick="trocarAba('financeiro')">💰 Fluxo de Caixa & Balanço</button>
     <button class="aba-btn" id="tabGestaoBtn" onclick="trocarAba('gestao')">⚙️ Cardápio, Taxas & Entregadores</button>
 </div>
 
@@ -173,17 +184,21 @@
     <div class="grid-pedidos" id="listaPedidos">Carregando pedidos...</div>
 </div>
 
-<!-- ABA 2: FLUXO DE CAIXA E EXPEDIENTES -->
+<!-- ABA 2: FLUXO DE CAIXA, BALANÇO ANUAL E POR PERÍODO -->
 <div id="abaFinanceiro" style="display:none;">
-    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-        <label style="font-weight:bold;">Filtrar Mês:</label>
-        <input type="month" id="filtroMes" onchange="carregarFinanceiro()" style="background:#1e1e1e; color:#fff; border:1px solid #444; padding:8px 12px; border-radius:8px;">
-        <button class="btn-amarelo" onclick="carregarFinanceiro()">Atualizar Relatório</button>
+    <div class="filtros-fin">
+        <label style="font-weight:bold; font-size:13px;">De:</label>
+        <input type="month" id="filtroMesInicio" onchange="carregarFinanceiro()">
+        <label style="font-weight:bold; font-size:13px;">Até:</label>
+        <input type="month" id="filtroMesFim" onchange="carregarFinanceiro()">
+        <button class="btn-amarelo" onclick="carregarFinanceiro()">🔍 Gerar Balanço</button>
+        <button class="btn-cinza" onclick="definirPeriodoMesAtual()">📅 Este Mês</button>
+        <button class="btn-azul" onclick="definirPeriodoAnoAtual()">📊 Balanço Anual (Jan a Dez)</button>
     </div>
 
     <div class="kpi-grid">
         <div class="kpi-card" style="border-top:4px solid var(--verde);">
-            <small>✅ VENDAS PAGAS (ENTROU NO CAIXA)</small>
+            <small>✅ VENDAS PAGAS (GANHOS NO PERÍODO)</small>
             <div class="kpi-valor" style="color:#4cd964;" id="kpiPago">R$ 0,00</div>
             <small id="kpiQtdPago">0 pedidos</small>
         </div>
@@ -198,7 +213,7 @@
             <small id="kpiQtdCancelado">0 pedidos</small>
         </div>
         <div class="kpi-card" style="border-top:4px solid var(--azul);">
-            <small>🕒 TEMPO DE LOJA ABERTA NO MÊS</small>
+            <small>🕒 TEMPO DE LOJA ABERTA</small>
             <div class="kpi-valor" style="color:#4fc3f7;" id="kpiHoras">0min</div>
             <small id="kpiQtdExp">0 expedientes</small>
         </div>
@@ -209,7 +224,20 @@
         <div id="resumoFormas" style="display:flex; gap:12px; flex-wrap:wrap; font-size:14px;"></div>
     </div>
 
-    <h3 style="color:var(--amarelo); margin: 14px 0 8px;">🕒 Histórico de Expedientes do Mês</h3>
+    <h3 style="color:var(--amarelo); margin: 14px 0 8px;">📊 Balanço Mês a Mês no Período</h3>
+    <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Mês/Ano</th><th>Pedidos Pagos</th><th>Ganhos (Pagos)</th>
+                    <th>A Receber</th><th>Cancelados</th><th>Tempo Aberto</th>
+                </tr>
+            </thead>
+            <tbody id="tabelaResumoMensal"></tbody>
+        </table>
+    </div>
+
+    <h3 style="color:var(--amarelo); margin: 14px 0 8px;">🕒 Histórico de Expedientes</h3>
     <div style="overflow-x:auto;">
         <table>
             <thead>
@@ -221,7 +249,7 @@
         </table>
     </div>
 
-    <h3 style="color:var(--amarelo); margin: 14px 0 8px;">📋 Histórico de Pedidos do Mês</h3>
+    <h3 style="color:var(--amarelo); margin: 14px 0 8px;">📋 Todos os Pedidos do Período</h3>
     <div style="overflow-x:auto;">
         <table>
             <thead>
@@ -295,7 +323,6 @@
         <div id="listaAdminProdutos"></div>
     </div>
 
-    <!-- SEGURANCA: ALTERAR SENHA DO ADMIN E LIMPAR PEDIDOS -->
     <div class="painel-form" style="border: 1px solid #444;">
         <h3 style="color:var(--amarelo); margin-bottom:8px;">🔐 Alterar Senha do Painel Administrador</h3>
         <input id="senhaAtualInput" type="password" placeholder="Senha atual (padrão inicial: 1234)">
@@ -391,6 +418,10 @@
         const h = Math.floor((m || 0) / 60);
         const min = (m || 0) % 60;
         return h > 0 ? `${h}h ${min}min` : `${min}min`;
+    };
+    const fmtMesAno = ma => {
+        const [ano, mes] = String(ma).split("-");
+        return mes && ano ? `${mes}/${ano}` : ma;
     };
 
     let somAtivo = true;
@@ -491,7 +522,22 @@
     let fotoBase64Atual = "";
 
     const hoje = new Date();
-    document.getElementById("filtroMes").value = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
+    const mesAtualStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
+    document.getElementById("filtroMesInicio").value = mesAtualStr;
+    document.getElementById("filtroMesFim").value = mesAtualStr;
+
+    function definirPeriodoMesAtual() {
+        document.getElementById("filtroMesInicio").value = mesAtualStr;
+        document.getElementById("filtroMesFim").value = mesAtualStr;
+        carregarFinanceiro();
+    }
+
+    function definirPeriodoAnoAtual() {
+        const ano = hoje.getFullYear();
+        document.getElementById("filtroMesInicio").value = `${ano}-01`;
+        document.getElementById("filtroMesFim").value = `${ano}-12`;
+        carregarFinanceiro();
+    }
 
     async function carregarStatusLoja() {
         const r = await fetch("/api/admin/loja-status");
@@ -789,8 +835,9 @@
     function imprimir80mm(id) { window.open(`/imprimir/${id}`, "Impressao80mm", "width=340,height=600"); }
 
     async function carregarFinanceiro() {
-        const mes = document.getElementById("filtroMes").value;
-        const r = await fetch(`/api/admin/financeiro?mes=${mes}`);
+        const inicio = document.getElementById("filtroMesInicio").value || mesAtualStr;
+        const fim = document.getElementById("filtroMesFim").value || inicio;
+        const r = await fetch(`/api/admin/financeiro?mes_inicio=${inicio}&mes_fim=${fim}`);
         const d = await r.json();
 
         document.getElementById("kpiPago").innerText = fmt(d.total_pago);
@@ -805,7 +852,20 @@
         const formas = Object.entries(d.por_forma_pagamento);
         document.getElementById("resumoFormas").innerHTML = formas.length
             ? formas.map(([f, v]) => `<div style="background:#141414; padding:8px 14px; border-radius:8px; border:1px solid #333;"><strong>${f}:</strong> <span style="color:#4cd964;">${fmt(v)}</span></div>`).join("")
-            : "<span style='color:#888;'>Nenhuma venda paga registrada neste mês ainda.</span>";
+            : "<span style='color:#888;'>Nenhuma venda paga registrada neste período ainda.</span>";
+
+        document.getElementById("tabelaResumoMensal").innerHTML = (d.resumo_mensal && d.resumo_mensal.length)
+            ? d.resumo_mensal.map(m => `
+                <tr>
+                    <td><strong>${fmtMesAno(m.mes)}</strong></td>
+                    <td>${m.qtd_pago}</td>
+                    <td style="color:#4cd964;"><strong>${fmt(m.pago)}</strong></td>
+                    <td style="color:var(--amarelo);">${fmt(m.nao_pago)}</td>
+                    <td style="color:#ff5252;">${fmt(m.cancelado)} (${m.qtd_cancelado})</td>
+                    <td>${fmtMinutos(m.minutos)}</td>
+                </tr>
+            `).join("")
+            : `<tr><td colspan="6" style="text-align:center; color:#888;">Nenhum movimento registrado neste período.</td></tr>`;
 
         document.getElementById("tabelaExpedientes").innerHTML = (d.expedientes && d.expedientes.length)
             ? d.expedientes.map(e => `
@@ -816,7 +876,7 @@
                     <td><strong>${e.fim_hora ? fmtMinutos(e.duracao_minutos) : '—'}</strong></td>
                 </tr>
             `).join("")
-            : `<tr><td colspan="4" style="text-align:center; color:#888;">Nenhum expediente encerrado em ${mes}.</td></tr>`;
+            : `<tr><td colspan="4" style="text-align:center; color:#888;">Nenhum expediente registrado neste período.</td></tr>`;
 
         document.getElementById("tabelaHistorico").innerHTML = d.pedidos.length
             ? d.pedidos.map(p => `
@@ -826,7 +886,7 @@
                     <td>${p.status}</td><td><strong>${fmt(p.total)}</strong></td>
                 </tr>
             `).join("")
-            : `<tr><td colspan="7" style="text-align:center; color:#888;">Nenhum pedido encontrado em ${mes}.</td></tr>`;
+            : `<tr><td colspan="7" style="text-align:center; color:#888;">Nenhum pedido encontrado neste período.</td></tr>`;
     }
 
     async function carregarGestao() {
