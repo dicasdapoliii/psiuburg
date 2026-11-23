@@ -20,7 +20,6 @@ ENDERECO_LOJA = "Avenida Guarapuava, 1735 - Jardim Rondônia, Rondonópolis - MT
 INSTAGRAM_LOJA = "https://www.instagram.com/psiuburg?knvt=aWxnNmx1b3F1MWV3"
 FUSO_HORARIO = timezone(timedelta(hours=-4))  # Horario de MT (UTC-4)
 
-# Coordenadas aproximadas da Av. Guarapuava, 1735 - Jardim Rondonia, Rondonopolis - MT
 LAT_LOJA = -16.4708
 LNG_LOJA = -54.6356
 TAXA_PADRAO_SE_NAO_LOCALIZAR = 8.00
@@ -55,12 +54,14 @@ class Produto(db.Model):
     categoria = db.Column(db.String(80), nullable=False)
     descricao = db.Column(db.Text, default="")
     preco = db.Column(db.Float, nullable=False)
+    imagem_url = db.Column(db.Text, default="")
     ativo = db.Column(db.Integer, default=1)
 
     def to_dict(self):
         return {
             "id": self.id, "nome": self.nome, "categoria": self.categoria,
-            "descricao": self.descricao, "preco": self.preco, "ativo": self.ativo
+            "descricao": self.descricao, "preco": self.preco,
+            "imagem_url": self.imagem_url or "", "ativo": self.ativo
         }
 
 
@@ -79,7 +80,7 @@ class Entregador(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(120), nullable=False)
     whatsapp = db.Column(db.String(30), nullable=False)
-    padrao = db.Column(db.Integer, default=0)  # 1 = Fixo do dia (recebe automatico ao aceitar)
+    padrao = db.Column(db.Integer, default=0)
 
     def to_dict(self):
         return {
@@ -172,29 +173,50 @@ def limpar_numeros(valor):
     return "".join(c for c in str(valor or "") if c.isdigit())
 
 
+def formatar_chat_id_brasil(telefone):
+    """Formata o numero para o padrao do WhatsApp (remove o 9o digito em DDDs > 28 como MT)."""
+    num = limpar_numeros(telefone)
+    if len(num) < 10:
+        return None
+    if not num.startswith("55"):
+        num = "55" + num
+    # Para DDDs acima de 28 (ex: 66, 65), o WhatsApp costuma registrar sem o 9o digito
+    if len(num) == 13 and num.startswith("55"):
+        ddd = int(num[2:4])
+        if ddd > 28 and num[4] == "9":
+            num = num[:4] + num[5:]
+    return f"{num}@c.us"
+
+
 def enviar_whatsapp_automatico(telefone, mensagem):
-    """Envia mensagem automaticamente via Green-API se WHATSAPP_API_URL estiver no Render."""
-    if not WHATSAPP_API_URL or not telefone:
-        return False
+    """Envia mensagem automaticamente via Green-API e retorna (sucesso, detalhe)."""
+    if not WHATSAPP_API_URL:
+        return False, "WHATSAPP_API_URL não configurada no Render"
+    chat_id = formatar_chat_id_brasil(telefone)
+    if not chat_id:
+        return False, "Número de telefone inválido (falta DDD)"
     try:
-        num = limpar_numeros(telefone)
-        if not num.startswith("55"):
-            num = "55" + num
-        payload = json.dumps({"chatId": f"{num}@c.us", "message": mensagem}).encode("utf-8")
+        payload = json.dumps({"chatId": chat_id, "message": mensagem}).encode("utf-8")
         req = urllib.request.Request(
             WHATSAPP_API_URL,
             data=payload,
             headers={"Content-Type": "application/json"},
             method="POST"
         )
-        with urllib.request.urlopen(req, timeout=5) as resp:
-            return resp.status == 200
-    except Exception:
-        return False
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            body = resp.read().decode("utf-8", errors="ignore")
+            print(f"[GREEN-API OK] {chat_id} -> {resp.status} {body}", flush=True)
+            return resp.status == 200, "Enviado"
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="ignore")
+        print(f"[GREEN-API ERRO HTTP] {chat_id} -> {e.code} {err_body}", flush=True)
+        return False, f"Erro Green-API ({e.code}): verifique limite do plano ou autorização"
+    except Exception as e:
+        print(f"[GREEN-API ERRO] {chat_id} -> {e}", flush=True)
+        return False, str(e)
 
 
 def montar_mensagem_entregador(p):
-    """Monta o texto limpo e direto para o motoboy."""
     total_fmt = f"R$ {p.total:.2f}".replace(".", ",")
     if p.status_pagamento == "Pago":
         aviso_pag = "✅ *JÁ PAGO ONLINE (NÃO COBRAR)*"
@@ -256,6 +278,7 @@ def init_db():
         db.create_all()
 
         colunas_novas = [
+            "ALTER TABLE produtos ADD COLUMN imagem_url TEXT DEFAULT ''",
             "ALTER TABLE clientes ADD COLUMN cpf VARCHAR(20) DEFAULT ''",
             "ALTER TABLE clientes ADD COLUMN senha VARCHAR(100) DEFAULT ''",
             "ALTER TABLE clientes ADD COLUMN enderecos_json TEXT DEFAULT '[]'",
@@ -574,28 +597,31 @@ def atualizar_status(pedido_id):
     p.status = novo_status
     db.session.commit()
 
-    # 1) Avisa o cliente automaticamente via Green-API (se configurada)
+    whats_ok, whats_msg = False, ""
     msgs = {
         "Aceito": f"Olá {p.cliente_nome}! 👍 *Seu pedido #{p.id} foi aceito* na {NOME_LOJA}!",
         "Em Preparo": f"Olá {p.cliente_nome}! 🔥 *Seu pedido #{p.id} está sendo preparado* com todo capricho na chapa! 🍔",
         "Saiu para Entrega": f"Olá {p.cliente_nome}! 🛵 *Seu pedido #{p.id} saiu para entrega!* Já já chega aí! 🍔🔥"
     }
     if novo_status in msgs:
-        enviar_whatsapp_automatico(p.cliente_whatsapp, msgs[novo_status])
+        whats_ok, whats_msg = enviar_whatsapp_automatico(p.cliente_whatsapp, msgs[novo_status])
 
-    # 2) Se foi ACEITO e for ENTREGA, envia automaticamente para o entregador FIXO DO DIA (se houver)
-    entregador_aviso = False
+    ent_ok = False
     if novo_status == "Aceito" and p.tipo_entrega == "Entrega":
         fixo = Entregador.query.filter_by(padrao=1).first()
         if fixo:
-            entregador_aviso = enviar_whatsapp_automatico(fixo.whatsapp, montar_mensagem_entregador(p))
+            ent_ok, _ = enviar_whatsapp_automatico(fixo.whatsapp, montar_mensagem_entregador(p))
 
-    return jsonify({"sucesso": True, "entregador_avisado_auto": entregador_aviso})
+    return jsonify({
+        "sucesso": True,
+        "whats_ok": whats_ok,
+        "whats_msg": whats_msg,
+        "entregador_avisado_auto": ent_ok
+    })
 
 
 @app.route("/api/admin/pedidos/<int:pedido_id>/enviar-entregador", methods=["POST"])
 def enviar_pedido_entregador(pedido_id):
-    """Envia os dados da entrega para um entregador especifico (automatico ou retorna link wa.me)."""
     p = Pedido.query.get_or_404(pedido_id)
     d = request.json or {}
     ent_id = d.get("entregador_id")
@@ -609,13 +635,14 @@ def enviar_pedido_entregador(pedido_id):
             if not fone.startswith("55"):
                 fone = "55" + fone
 
-    enviado_auto = False
+    enviado_auto, detalhe = False, ""
     if fone and WHATSAPP_API_URL:
-        enviado_auto = enviar_whatsapp_automatico(fone, msg)
+        enviado_auto, detalhe = enviar_whatsapp_automatico(fone, msg)
 
     return jsonify({
         "sucesso": True,
         "enviado_auto": enviado_auto,
+        "detalhe": detalhe,
         "whatsapp": fone,
         "mensagem": msg
     })
@@ -625,17 +652,18 @@ def enviar_pedido_entregador(pedido_id):
 def atualizar_pagamento(pedido_id):
     p = Pedido.query.get_or_404(pedido_id)
     d = request.json or {}
+    whats_ok, whats_msg = False, ""
     if "status_pagamento" in d:
         p.status_pagamento = d["status_pagamento"]
         if d["status_pagamento"] == "Pago":
-            enviar_whatsapp_automatico(
+            whats_ok, whats_msg = enviar_whatsapp_automatico(
                 p.cliente_whatsapp,
                 f"Olá {p.cliente_nome}! ✅ *Pagamento realizado com sucesso!* Recebemos a confirmação do seu pedido #{p.id} na {NOME_LOJA} 🍔"
             )
     if "link_pagamento" in d:
         p.link_pagamento = d["link_pagamento"].strip()
     db.session.commit()
-    return jsonify({"sucesso": True})
+    return jsonify({"sucesso": True, "whats_ok": whats_ok, "whats_msg": whats_msg})
 
 
 @app.route("/api/admin/financeiro")
@@ -688,8 +716,11 @@ def gerenciar_produtos():
     if request.method == "POST":
         d = request.json or {}
         db.session.add(Produto(
-            nome=d["nome"], categoria=d["categoria"],
-            descricao=d.get("descricao", ""), preco=float(d["preco"]), ativo=1
+            nome=d["nome"].strip(), categoria=d["categoria"],
+            descricao=d.get("descricao", "").strip(),
+            preco=float(d["preco"]),
+            imagem_url=d.get("imagem_url", ""),
+            ativo=1
         ))
         db.session.commit()
         return jsonify({"sucesso": True})
@@ -709,6 +740,8 @@ def editar_ou_excluir_produto(prod_id):
         p.categoria = d.get("categoria", p.categoria)
         p.descricao = d.get("descricao", p.descricao).strip()
         p.preco = float(d.get("preco", p.preco))
+        if "imagem_url" in d and d["imagem_url"] is not None:
+            p.imagem_url = d["imagem_url"]
         db.session.commit()
         return jsonify({"sucesso": True})
 
@@ -739,20 +772,26 @@ def gerenciar_entregadores():
     return jsonify([e.to_dict() for e in Entregador.query.order_by(Entregador.nome).all()])
 
 
+@app.route("/api/admin/entregadores/<int:ent_id>", methods=["PUT", "DELETE"])
+def editar_ou_excluir_entregador(ent_id):
+    ent = Entregador.query.get_or_404(ent_id)
+    if request.method == "PUT":
+        d = request.json or {}
+        ent.nome = d.get("nome", ent.nome).strip()
+        ent.whatsapp = limpar_numeros(d.get("whatsapp", ent.whatsapp))
+        db.session.commit()
+        return jsonify({"sucesso": True})
+    db.session.delete(ent)
+    db.session.commit()
+    return jsonify({"sucesso": True})
+
+
 @app.route("/api/admin/entregadores/<int:ent_id>/padrao", methods=["POST"])
 def definir_entregador_padrao(ent_id):
     ent = Entregador.query.get_or_404(ent_id)
     novo_valor = 0 if ent.padrao == 1 else 1
     Entregador.query.update({Entregador.padrao: 0})
     ent.padrao = novo_valor
-    db.session.commit()
-    return jsonify({"sucesso": True})
-
-
-@app.route("/api/admin/entregadores/<int:ent_id>", methods=["DELETE"])
-def excluir_entregador(ent_id):
-    ent = Entregador.query.get_or_404(ent_id)
-    db.session.delete(ent)
     db.session.commit()
     return jsonify({"sucesso": True})
 
@@ -765,9 +804,15 @@ def adicionar_faixa():
     return jsonify({"sucesso": True})
 
 
-@app.route("/api/admin/faixas/<int:faixa_id>", methods=["DELETE"])
-def excluir_faixa(faixa_id):
+@app.route("/api/admin/faixas/<int:faixa_id>", methods=["PUT", "DELETE"])
+def editar_ou_excluir_faixa(faixa_id):
     f = FaixaEntrega.query.get_or_404(faixa_id)
+    if request.method == "PUT":
+        d = request.json or {}
+        f.ate_km = float(d.get("ate_km", f.ate_km))
+        f.taxa = float(d.get("taxa", f.taxa))
+        db.session.commit()
+        return jsonify({"sucesso": True})
     db.session.delete(f)
     db.session.commit()
     return jsonify({"sucesso": True})
