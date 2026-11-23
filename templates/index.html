@@ -200,7 +200,6 @@
             <button class="btn-fechar" onclick="fecharModal('modalConta')">✕</button>
         </div>
 
-        <!-- TELA 1: LOGIN COM CPF E SENHA -->
         <div id="telaLogin">
             <p style="font-size:13px; color:var(--cinza); margin-bottom:12px;">
                 Entre com seu CPF e senha para selecionar seu endereço de entrega.
@@ -215,7 +214,6 @@
             </div>
         </div>
 
-        <!-- TELA 2: CADASTRO -->
         <div id="telaCadastro" style="display:none;">
             <p style="font-size:13px; color:var(--cinza); margin-bottom:6px;">
                 Preencha uma única vez para agilizar seus próximos pedidos!
@@ -245,18 +243,15 @@
             </div>
         </div>
 
-        <!-- TELA 3: ESCOLHER ENDEREÇO (ABRE LOGO APOS O LOGIN) -->
         <div id="telaEnderecos" style="display:none;">
             <p style="font-size:13px; color:var(--cinza); margin-bottom:12px;">
                 Toque no endereço onde deseja receber seu pedido para ir direto ao cardápio:
             </p>
             <div id="listaEnderecosSalvos"></div>
-
             <button class="btn-secundario" style="width:100%; margin-top:8px;" onclick="mostrarTelaConta('novoEndereco')">➕ Adicionar Outro Endereço</button>
             <button class="btn-secundario" style="width:100%; margin-top:8px; color:var(--amarelo);" onclick="mostrarTelaConta('perfil')">⚙️ Alterar Meu Cadastro / Ver Pedidos</button>
         </div>
 
-        <!-- TELA 4: ADICIONAR NOVO ENDEREÇO -->
         <div id="telaNovoEndereco" style="display:none;">
             <label>Apelido do endereço (ex: Trabalho, Casa da Mãe):</label>
             <input id="novoApelido" placeholder="Ex: Trabalho">
@@ -275,7 +270,6 @@
             <button class="btn-secundario" style="width:100%; margin-top:8px;" onclick="mostrarTelaConta('enderecos')">← Voltar</button>
         </div>
 
-        <!-- TELA 5: ALTERAR CADASTRO + HISTÓRICO -->
         <div id="telaPerfil" style="display:none;">
             <label>Seu Nome:</label>
             <input id="perfNome">
@@ -434,7 +428,8 @@
         </a>
 
         <button class="btn-principal" style="background:#25D366; color:#fff;" onclick="abrirWhatsLoja()">💬 Encaminhar Pedido no WhatsApp</button>
-        <button class="btn-secundario" style="margin-top:12px; width:100%;" onclick="fecharModal('modalRastreio')">Voltar ao Cardápio</button>
+        <button class="btn-principal" style="margin-top:10px;" onclick="fecharModal('modalRastreio')">🛒 Fazer Novo Pedido</button>
+        <button class="btn-secundario" style="margin-top:10px; width:100%; color:#ff5252; border-color:#ff5252;" onclick="sairAposPedido()">🚪 Sair da Conta</button>
     </div>
 </div>
 
@@ -617,7 +612,7 @@
         const lista = (c.enderecos && c.enderecos.length) ? c.enderecos : [c];
         const escolhido = lista[idx] || lista[0];
         aplicarEnderecoNoCheckout(escolhido);
-        fecharModal("modalConta"); // Encaminha direto para o cardapio!
+        fecharModal("modalConta");
     }
 
     function preencherTelaPerfil(c) {
@@ -648,7 +643,7 @@
             preencherTelaPerfil(d.cliente);
             renderizarEnderecosSalvos(d.cliente);
             renderizarHistorico(d.pedidos);
-            mostrarTelaConta("enderecos"); // Abre direto na escolha do endereco!
+            mostrarTelaConta("enderecos");
         } else if (d.nao_encontrado) {
             alert("CPF ainda não cadastrado. Vamos criar sua conta agora!");
             document.getElementById("cadCpf").value = cpf;
@@ -681,7 +676,7 @@
         if (d.sucesso) {
             localStorage.setItem("psiuburg_cliente", JSON.stringify(d.cliente));
             aplicarEnderecoNoCheckout(payload);
-            fecharModal("modalConta"); // Ja vai para o cardapio com o novo endereco selecionado
+            fecharModal("modalConta");
         }
     }
 
@@ -772,7 +767,14 @@
         localStorage.removeItem("psiuburg_cliente");
         gpsLat = null; gpsLng = null;
         ["ckNome","ckWhats","ckCep","ckRua","ckNumero","ckBairro","ckComp"].forEach(id => document.getElementById(id).value = "");
-        carregarClienteLocal(); fecharModal("modalConta");
+        carregarClienteLocal();
+        fecharModal("modalConta");
+    }
+
+    function sairAposPedido() {
+        if (timerRastreio) clearInterval(timerRastreio);
+        sairConta();
+        fecharModal("modalRastreio");
     }
 
     function renderizarCategorias() {
