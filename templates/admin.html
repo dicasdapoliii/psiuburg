@@ -9,7 +9,6 @@
         * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; }
         body { background: var(--bg); color: #f1f1f1; padding: 16px; }
 
-        /* Tela de Senha do Administrador */
         #telaBloqueio {
             position: fixed; inset: 0; background: #0e0e0e; z-index: 100;
             display: flex; justify-content: center; align-items: center; padding: 16px;
@@ -67,13 +66,20 @@
 
         .itens-lista { background: #141414; padding: 10px; border-radius: 8px; margin: 10px 0; font-size: 13px; }
         .acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+        .box-entregador-card {
+            display: flex; gap: 6px; margin-top: 8px; align-items: center;
+            background: #161224; padding: 8px; border-radius: 8px; border: 1px solid #3f2b75;
+        }
+        .box-entregador-card select {
+            flex: 1; background: #111; color: #fff; border: 1px solid #444; padding: 7px; border-radius: 6px; font-size: 12px;
+        }
 
-        .painel-form { background: var(--card); padding: 16px; border-radius: 12px; margin-bottom: 18px; max-width: 750px; }
+        .painel-form { background: var(--card); padding: 16px; border-radius: 12px; margin-bottom: 18px; max-width: 780px; }
         .painel-form input, .painel-form select {
             width: 100%; padding: 10px; margin: 6px 0 10px; background: #111; border: 1px solid #333; color: #fff; border-radius: 8px;
         }
         .linha-item {
-            display: flex; justify-content: space-between; align-items: center;
+            display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;
             padding: 10px; background: #181818; border-radius: 8px; margin-bottom: 6px;
         }
 
@@ -104,19 +110,19 @@
     <div class="botoes-topo">
         <button id="btnSom" class="btn-vermelho" onclick="ativarSom()">🔇 Ativar Alerta Sonoro</button>
         <button class="btn-cinza" onclick="carregarPedidos()">🔄 Atualizar</button>
-        <a href="/" target="_blank"><button class="btn-amarelo">📱 Abrir Cardápio</button></a>
+        <a href="/" target="_blank"><button class="btn-amarelo">📱 Ver Cardápio</button></a>
     </div>
 </div>
 
 <label class="chk-whats-bar">
-    <input type="checkbox" id="chkAutoWhats" checked style="width:auto;">
-    <span>💬 Abrir WhatsApp automaticamente para avisar o cliente ao confirmar pagamento ou mudar status</span>
+    <input type="checkbox" id="chkAutoWhats" style="width:auto;">
+    <span>💬 Abrir janela do WhatsApp Web manualmente (desmarque se já conectou o Green-API no Render)</span>
 </label>
 
 <div class="abas">
     <button class="aba-btn ativa" id="tabPedidosBtn" onclick="trocarAba('pedidos')">📋 Pedidos ao Vivo</button>
     <button class="aba-btn" id="tabFinanceiroBtn" onclick="trocarAba('financeiro')">💰 Fluxo de Caixa</button>
-    <button class="aba-btn" id="tabGestaoBtn" onclick="trocarAba('gestao')">⚙️ Cardápio & Taxas (KM)</button>
+    <button class="aba-btn" id="tabGestaoBtn" onclick="trocarAba('gestao')">⚙️ Cardápio, Taxas & Entregadores</button>
 </div>
 
 <!-- ABA 1: PEDIDOS -->
@@ -173,21 +179,33 @@
     </div>
 </div>
 
-<!-- ABA 3: CARDAPIO E TAXAS POR KM -->
+<!-- ABA 3: CARDAPIO, TAXAS E ENTREGADORES -->
 <div id="abaGestao" style="display:none;">
+    <!-- ENTREGADORES -->
     <div class="painel-form">
-        <h3 style="color:var(--amarelo); margin-bottom:6px;">🛵 Tabela de Taxa de Entrega por Quilometragem</h3>
+        <h3 style="color:var(--amarelo); margin-bottom:6px;">🛵 Cadastro de Entregadores (Motoboys)</h3>
         <p style="font-size:13px; color:#aaa; margin-bottom:10px;">
-            O sistema calcula a distância automaticamente e aplica a taxa correspondente abaixo:
+            Marque um entregador como <strong>⭐ Fixo do Dia</strong> para ele receber o endereço automaticamente no WhatsApp assim que você aceitar o pedido!
         </p>
+        <input id="eNome" placeholder="Nome do Entregador (ex: João Motoboy)">
+        <input id="eWhats" placeholder="WhatsApp com DDD (ex: 66999998888)">
+        <button class="btn-amarelo" onclick="salvarEntregador()">+ Cadastrar Entregador</button>
+        <div id="listaAdminEntregadores" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- TAXAS POR KM -->
+    <div class="painel-form">
+        <h3 style="color:var(--amarelo); margin-bottom:6px;">📍 Tabela de Taxa de Entrega por Quilometragem</h3>
         <input id="fKm" type="number" step="0.5" placeholder="Até quantos KM? (ex: 3)">
         <input id="fTaxa" type="number" step="0.50" placeholder="Valor da taxa em R$ (ex: 6.00)">
         <button class="btn-amarelo" onclick="salvarFaixa()">+ Adicionar Faixa de KM</button>
         <div id="listaAdminFaixas" style="margin-top:12px;"></div>
     </div>
 
-    <div class="painel-form">
-        <h3 style="color:var(--amarelo); margin-bottom:10px;">+ Novo Produto no Cardápio</h3>
+    <!-- CRIAR / EDITAR PRODUTO -->
+    <div class="painel-form" id="boxFormProduto">
+        <h3 style="color:var(--amarelo); margin-bottom:10px;" id="tituloFormProd">+ Novo Produto no Cardápio</h3>
+        <input type="hidden" id="pEditId" value="">
         <input id="pNome" placeholder="Nome do lanche (ex: Psiu! Cheddar)">
         <select id="pCat">
             <option value="Burgers">Burgers</option>
@@ -197,26 +215,26 @@
         </select>
         <input id="pDesc" placeholder="Descrição dos ingredientes">
         <input id="pPreco" type="number" step="0.01" placeholder="Preço (ex: 29.90)">
-        <button class="btn-amarelo" onclick="salvarProduto()">Salvar Produto</button>
+        <div style="display:flex; gap:8px;">
+            <button class="btn-amarelo" id="btnSalvarProd" onclick="salvarProduto()">Salvar Produto</button>
+            <button class="btn-cinza" id="btnCancelarEdicao" style="display:none;" onclick="cancelarEdicaoProduto()">Cancelar Edição</button>
+        </div>
     </div>
 
     <div class="painel-form">
-        <h3 style="color:var(--amarelo); margin-bottom:10px;">Produtos Cadastrados</h3>
+        <h3 style="color:var(--amarelo); margin-bottom:10px;">Produtos Cadastrados (Clique em ✏️ Editar para alterar)</h3>
         <div id="listaAdminProdutos"></div>
     </div>
 </div>
 
 <script>
-    // SENHA DO PAINEL (Voce pode trocar "1234" pela senha que preferir)
     const SENHA_ADMIN = "1234";
-
     if (sessionStorage.getItem("psiuburg_adm_ok") === "1") {
         document.getElementById("telaBloqueio").style.display = "none";
     }
 
     function verificarSenha() {
-        const digitada = document.getElementById("inputSenhaAdm").value;
-        if (digitada === SENHA_ADMIN) {
+        if (document.getElementById("inputSenhaAdm").value === SENHA_ADMIN) {
             sessionStorage.setItem("psiuburg_adm_ok", "1");
             document.getElementById("telaBloqueio").style.display = "none";
         } else {
@@ -229,6 +247,8 @@
     let primeiraCarga = true;
     let audioCtx = null;
     let PEDIDOS_CACHE = {};
+    let ENTREGADORES_CACHE = [];
+    let PRODUTOS_CACHE = [];
 
     const fmt = v => "R$ " + Number(v).toFixed(2).replace(".", ",");
     const hoje = new Date();
@@ -282,7 +302,13 @@
         window.open(`https://wa.me/${num}?text=${encodeURIComponent(texto)}`, "_blank");
     }
 
+    async function carregarEntregadoresCache() {
+        const r = await fetch("/api/admin/entregadores");
+        ENTREGADORES_CACHE = await r.json();
+    }
+
     async function carregarPedidos() {
+        await carregarEntregadoresCache();
         const r = await fetch("/api/admin/pedidos");
         const pedidos = await r.json();
 
@@ -300,6 +326,10 @@
 
         PEDIDOS_CACHE = {};
         pedidos.forEach(p => PEDIDOS_CACHE[p.id] = p);
+
+        const opcoesEntregador = ENTREGADORES_CACHE.length
+            ? ENTREGADORES_CACHE.map(e => `<option value="${e.id}" ${e.padrao ? 'selected' : ''}>${e.padrao ? '⭐ ' : ''}${e.nome}</option>`).join("")
+            : `<option value="">(Escolher no WhatsApp)</option>`;
 
         document.getElementById("listaPedidos").innerHTML = pedidos.map(p => {
             const classeStatus = p.status.replace(/\s+/g, '');
@@ -334,10 +364,14 @@
                     ${p.troco_para ? `<span style="color:var(--amarelo);"> (Troco p/ R$ ${p.troco_para})</span>` : ''}
                 </div>
 
+                ${p.tipo_entrega === 'Entrega' ? `
+                <div class="box-entregador-card">
+                    <select id="selEnt_${p.id}">${opcoesEntregador}</select>
+                    <button class="btn-roxo" onclick="enviarEntregador(${p.id})">🛵 Enviar</button>
+                </div>` : ''}
+
                 <div class="acoes">
                     <button class="btn-amarelo" onclick="imprimir80mm(${p.id})">🖨️ 80mm</button>
-
-                    ${p.tipo_entrega === 'Entrega' ? `<button class="btn-roxo" onclick="enviarEntregador(${p.id})">🛵 Enviar p/ Entregador</button>` : ''}
 
                     ${p.status !== 'Cancelado' && p.status_pagamento !== 'Pago' ? `
                         ${p.forma_pagamento.includes('Link') ? `<button class="btn-ton" onclick="enviarLinkTon(${p.id}, '${p.cliente_whatsapp}', ${p.total})">🔗 Link Ton</button>` : ''}
@@ -354,28 +388,23 @@
         }).join("");
     }
 
-    function enviarEntregador(id) {
-        const p = PEDIDOS_CACHE[id];
-        if (!p) return;
-        const avisoPag = p.status_pagamento === "Pago"
-            ? "✅ *JÁ PAGO ONLINE (NÃO COBRAR)*"
-            : `💰 *COBRAR NA ENTREGA:* ${fmt(p.total)} (${p.forma_pagamento})` + (p.troco_para ? ` — Troco p/ R$ ${p.troco_para}` : "");
-        const linkMapa = p.link_maps
-            ? p.link_maps
-            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.endereco + ", Rondonópolis - MT")}`;
+    async function enviarEntregador(id) {
+        const sel = document.getElementById(`selEnt_${id}`);
+        const entregador_id = sel ? sel.value : "";
 
-        const msg =
-`🛵 *ENTREGA — PEDIDO #${p.id}*
-
-👤 *Cliente:* ${p.cliente_nome}
-📞 *Telefone:* ${p.cliente_whatsapp}
-🏠 *Endereço:* ${p.endereco}
-
-📍 *Localização no Mapa:*
-${linkMapa}
-
-${avisoPag}`;
-        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+        const r = await fetch(`/api/admin/pedidos/${id}/enviar-entregador`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ entregador_id: entregador_id || null })
+        });
+        const d = await r.json();
+        if (d.enviado_auto) {
+            alert("✅ Mensagem enviada automaticamente para o WhatsApp do entregador!");
+        } else {
+            const url = d.whatsapp
+                ? `https://wa.me/${d.whatsapp}?text=${encodeURIComponent(d.mensagem)}`
+                : `https://wa.me/?text=${encodeURIComponent(d.mensagem)}`;
+            window.open(url, "_blank");
+        }
     }
 
     async function confirmarPago(id) {
@@ -465,6 +494,24 @@ ${avisoPag}`;
     async function carregarGestao() {
         const r = await fetch("/api/admin/produtos");
         const d = await r.json();
+        PRODUTOS_CACHE = d.produtos;
+
+        document.getElementById("listaAdminEntregadores").innerHTML = d.entregadores.length
+            ? d.entregadores.map(e => `
+                <div class="linha-item">
+                    <div>
+                        <strong>${e.nome}</strong> (${e.whatsapp})
+                        ${e.padrao ? '<span class="badge-pago" style="margin-left:6px;">⭐ FIXO DO DIA (AUTO)</span>' : ''}
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="${e.padrao ? 'btn-verde' : 'btn-cinza'}" onclick="toggleEntregadorPadrao(${e.id})">
+                            ${e.padrao ? 'Remover Fixo' : '⭐ Definir Fixo'}
+                        </button>
+                        <button class="btn-vermelho" onclick="delEntregador(${e.id})">✕</button>
+                    </div>
+                </div>
+            `).join("")
+            : "<p style='color:#888; font-size:13px;'>Nenhum entregador cadastrado ainda.</p>";
 
         document.getElementById("listaAdminFaixas").innerHTML = d.faixas.map(f => `
             <div class="linha-item">
@@ -477,11 +524,36 @@ ${avisoPag}`;
             <div class="linha-item">
                 <div><strong>${p.nome}</strong> (${p.categoria}) — ${fmt(p.preco)} ${p.ativo ? '' : '<span style="color:#ff5252;">[PAUSADO]</span>'}</div>
                 <div style="display:flex; gap:6px;">
+                    <button class="btn-azul" onclick="editarProduto(${p.id})">✏️ Editar</button>
                     <button class="btn-cinza" onclick="toggleProd(${p.id})">${p.ativo ? 'Pausar' : 'Ativar'}</button>
                     <button class="btn-vermelho" onclick="delProd(${p.id})">✕</button>
                 </div>
             </div>
         `).join("");
+    }
+
+    async function salvarEntregador() {
+        const nome = document.getElementById("eNome").value.trim();
+        const whatsapp = document.getElementById("eWhats").value.trim();
+        if (!nome || !whatsapp) return alert("Preencha nome e WhatsApp do entregador!");
+        await fetch("/api/admin/entregadores", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nome, whatsapp })
+        });
+        document.getElementById("eNome").value = ""; document.getElementById("eWhats").value = "";
+        carregarGestao();
+    }
+
+    async function toggleEntregadorPadrao(id) {
+        await fetch(`/api/admin/entregadores/${id}/padrao`, { method: "POST" });
+        carregarGestao();
+    }
+
+    async function delEntregador(id) {
+        if (confirm("Excluir entregador?")) {
+            await fetch(`/api/admin/entregadores/${id}`, { method: "DELETE" });
+            carregarGestao();
+        }
     }
 
     async function salvarFaixa() {
@@ -498,18 +570,54 @@ ${avisoPag}`;
 
     async function delFaixa(id) { if (confirm("Excluir esta faixa de KM?")) { await fetch(`/api/admin/faixas/${id}`, { method: "DELETE" }); carregarGestao(); } }
 
+    function editarProduto(id) {
+        const p = PRODUTOS_CACHE.find(x => x.id === id);
+        if (!p) return;
+        document.getElementById("pEditId").value = p.id;
+        document.getElementById("pNome").value = p.nome;
+        document.getElementById("pCat").value = p.categoria;
+        document.getElementById("pDesc").value = p.descricao || "";
+        document.getElementById("pPreco").value = p.preco;
+        document.getElementById("tituloFormProd").innerText = `✏️ Editando: ${p.nome}`;
+        document.getElementById("btnSalvarProd").innerText = "💾 Salvar Alterações";
+        document.getElementById("btnCancelarEdicao").style.display = "inline-block";
+        document.getElementById("boxFormProduto").scrollIntoView({ behavior: "smooth" });
+    }
+
+    function cancelarEdicaoProduto() {
+        document.getElementById("pEditId").value = "";
+        document.getElementById("pNome").value = "";
+        document.getElementById("pDesc").value = "";
+        document.getElementById("pPreco").value = "";
+        document.getElementById("tituloFormProd").innerText = "+ Novo Produto no Cardápio";
+        document.getElementById("btnSalvarProd").innerText = "Salvar Produto";
+        document.getElementById("btnCancelarEdicao").style.display = "none";
+    }
+
     async function salvarProduto() {
+        const editId = document.getElementById("pEditId").value;
         const nome = document.getElementById("pNome").value.trim();
         const preco = document.getElementById("pPreco").value;
         if (!nome || !preco) return alert("Preencha nome e preço!");
-        await fetch("/api/admin/produtos", {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                nome, categoria: document.getElementById("pCat").value,
-                descricao: document.getElementById("pDesc").value.trim(), preco
-            })
-        });
-        document.getElementById("pNome").value = ""; document.getElementById("pDesc").value = ""; document.getElementById("pPreco").value = "";
+
+        const payload = {
+            nome, categoria: document.getElementById("pCat").value,
+            descricao: document.getElementById("pDesc").value.trim(), preco
+        };
+
+        if (editId) {
+            await fetch(`/api/admin/produtos/${editId}`, {
+                method: "PUT", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            cancelarEdicaoProduto();
+        } else {
+            await fetch("/api/admin/produtos", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            cancelarEdicaoProduto();
+        }
         carregarGestao();
     }
 
