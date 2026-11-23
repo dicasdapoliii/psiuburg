@@ -35,6 +35,10 @@
         }
         .topo h1 { color: var(--amarelo); font-size: 22px; }
         .botoes-topo { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .info-expediente {
+            font-size: 12px; color: #ddd; background: #222; border: 1px solid #444;
+            padding: 7px 12px; border-radius: 8px; font-weight: bold;
+        }
         button { cursor: pointer; border: none; border-radius: 8px; padding: 9px 12px; font-weight: bold; font-size: 13px; }
         .btn-amarelo { background: var(--amarelo); color: #000; }
         .btn-verde { background: var(--verde); color: #fff; }
@@ -45,7 +49,7 @@
         .btn-cinza { background: #333; color: #fff; }
         .btn-vermelho { background: var(--vermelho); color: #fff; }
 
-        .opcoes-barra { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+        .opcoes-barra { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; align-items: center; }
         .chk-whats-bar {
             background: #14281b; border: 1px solid #28a745; padding: 8px 14px;
             border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;
@@ -53,6 +57,14 @@
         .chk-auto-bar {
             background: #2b2208; border: 1px solid var(--amarelo); padding: 8px 14px;
             border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; color: #ffe082;
+        }
+        .box-tempo-alerta {
+            background: #102530; border: 1px solid var(--azul); padding: 6px 12px;
+            border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #b2ebf2;
+        }
+        .box-tempo-alerta input {
+            width: 56px; padding: 4px 6px; background: #0d161b; border: 1px solid var(--azul);
+            color: #fff; border-radius: 6px; text-align: center; font-weight: bold;
         }
 
         .abas { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
@@ -103,7 +115,7 @@
         .kpi-card { background: var(--card); border: 1px solid #333; border-radius: 12px; padding: 16px; }
         .kpi-card small { color: #aaa; font-size: 12px; }
         .kpi-valor { font-size: 24px; font-weight: 900; margin-top: 6px; }
-        table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; font-size: 13px; }
+        table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; font-size: 13px; margin-bottom: 18px; }
         th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #2b2b2b; }
         th { background: #252525; color: var(--amarelo); }
     </style>
@@ -126,8 +138,9 @@
 <div class="topo">
     <h1>🍔 Painel da Cozinha — {{ nome_loja }}</h1>
     <div class="botoes-topo">
-        <button id="btnStatusLoja" class="btn-verde" onclick="alternarStatusLoja()">🟢 Loja Aberta</button>
-        <button id="btnSom" class="btn-vermelho" onclick="ativarSom()">🔇 Ativar Alerta Sonoro</button>
+        <button id="btnStatusLoja" class="btn-verde" onclick="alternarStatusLoja()">🟢 Iniciar Expediente</button>
+        <span id="infoExpediente" class="info-expediente" style="display:none;"></span>
+        <button id="btnSom" class="btn-verde" onclick="alternarSom()">🔊 Voz & Som Ativos</button>
         <button class="btn-cinza" onclick="carregarPedidos()">🔄 Atualizar</button>
         <a href="/" target="_blank"><button class="btn-amarelo">📱 Ver Cardápio</button></a>
     </div>
@@ -136,8 +149,15 @@
 <div class="opcoes-barra">
     <label class="chk-auto-bar">
         <input type="checkbox" id="chkAceiteAuto" onchange="salvarPrefAceiteAuto()" style="width:auto;">
-        <span>⚡ <strong>Aceite e Impressão Automáticos</strong> (desmarcado = Aceite Manual)</span>
+        <span>⚡ <strong>Aceite e Impressão Automáticos</strong> (desmarque para Aceite Manual)</span>
     </label>
+
+    <div class="box-tempo-alerta">
+        <span>🔁 Lembrar pedido pendente a cada</span>
+        <input type="number" id="inputMinutosAlerta" min="1" max="60" value="3" onchange="salvarTempoAlerta()">
+        <span>min</span>
+        <button class="btn-azul" style="padding:4px 8px; font-size:11px;" onclick="testarVoz()">🔊 Testar Voz</button>
+    </div>
 
     <label class="chk-whats-bar">
         <input type="checkbox" id="chkAutoWhats" style="width:auto;">
@@ -147,7 +167,7 @@
 
 <div class="abas">
     <button class="aba-btn ativa" id="tabPedidosBtn" onclick="trocarAba('pedidos')">📋 Pedidos ao Vivo</button>
-    <button class="aba-btn" id="tabFinanceiroBtn" onclick="trocarAba('financeiro')">💰 Fluxo de Caixa</button>
+    <button class="aba-btn" id="tabFinanceiroBtn" onclick="trocarAba('financeiro')">💰 Fluxo de Caixa & Expediente</button>
     <button class="aba-btn" id="tabGestaoBtn" onclick="trocarAba('gestao')">⚙️ Cardápio, Taxas & Entregadores</button>
 </div>
 
@@ -156,7 +176,7 @@
     <div class="grid-pedidos" id="listaPedidos">Carregando pedidos...</div>
 </div>
 
-<!-- ABA 2: FLUXO DE CAIXA -->
+<!-- ABA 2: FLUXO DE CAIXA E EXPEDIENTES -->
 <div id="abaFinanceiro" style="display:none;">
     <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
         <label style="font-weight:bold;">Filtrar Mês:</label>
@@ -180,6 +200,11 @@
             <div class="kpi-valor" style="color:#ff5252;" id="kpiCancelado">R$ 0,00</div>
             <small id="kpiQtdCancelado">0 pedidos</small>
         </div>
+        <div class="kpi-card" style="border-top:4px solid var(--azul);">
+            <small>🕒 TEMPO DE LOJA ABERTA NO MÊS</small>
+            <div class="kpi-valor" style="color:#4fc3f7;" id="kpiHoras">0min</div>
+            <small id="kpiQtdExp">0 expedientes</small>
+        </div>
     </div>
 
     <div class="painel-form" style="max-width:100%;">
@@ -187,6 +212,19 @@
         <div id="resumoFormas" style="display:flex; gap:12px; flex-wrap:wrap; font-size:14px;"></div>
     </div>
 
+    <h3 style="color:var(--amarelo); margin: 14px 0 8px;">🕒 Histórico de Expedientes do Mês</h3>
+    <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Data</th><th>Abertura</th><th>Encerramento</th><th>Tempo Aberto</th>
+                </tr>
+            </thead>
+            <tbody id="tabelaExpedientes"></tbody>
+        </table>
+    </div>
+
+    <h3 style="color:var(--amarelo); margin: 14px 0 8px;">📋 Histórico de Pedidos do Mês</h3>
     <div style="overflow-x:auto;">
         <table>
             <thead>
@@ -271,13 +309,20 @@
         if (document.getElementById("inputSenhaAdm").value === SENHA_ADMIN) {
             sessionStorage.setItem("psiuburg_adm_ok", "1");
             document.getElementById("telaBloqueio").style.display = "none";
+            desbloquearAudio();
         } else {
             alert("Senha incorreta!");
         }
     }
 
+    // Aceite e Impressao Automaticos JA NASCEM ATIVADOS por padrao!
     const chkAceiteAuto = document.getElementById("chkAceiteAuto");
-    chkAceiteAuto.checked = localStorage.getItem("psiuburg_aceite_auto") === "1";
+    const prefAutoSalva = localStorage.getItem("psiuburg_aceite_auto");
+    chkAceiteAuto.checked = prefAutoSalva === null ? true : prefAutoSalva === "1";
+
+    const inputMinutosAlerta = document.getElementById("inputMinutosAlerta");
+    const minSalvo = parseInt(localStorage.getItem("psiuburg_min_alerta") || "3", 10);
+    inputMinutosAlerta.value = isNaN(minSalvo) || minSalvo < 1 ? 3 : minSalvo;
 
     function salvarPrefAceiteAuto() {
         localStorage.setItem("psiuburg_aceite_auto", chkAceiteAuto.checked ? "1" : "0");
@@ -286,18 +331,120 @@
             : "🖐️ Modo Manual ativado! Você aceita e imprime cada pedido quando quiser.");
     }
 
+    function salvarTempoAlerta() {
+        let m = parseInt(inputMinutosAlerta.value, 10);
+        if (isNaN(m) || m < 1) m = 1;
+        inputMinutosAlerta.value = m;
+        localStorage.setItem("psiuburg_min_alerta", String(m));
+        mostrarToast(`🔁 Lembrete de voz configurado para repetir a cada ${m} minuto(s).`);
+    }
+
+    const fmt = v => "R$ " + Number(v).toFixed(2).replace(".", ",");
+    const fmtMinutos = m => {
+        const h = Math.floor((m || 0) / 60);
+        const min = (m || 0) % 60;
+        return h > 0 ? `${h}h ${min}min` : `${min}min`;
+    };
+
+    // Som e Voz ja nascem ATIVADOS por padrao
+    let somAtivo = true;
+    let audioCtx = null;
+    let ultimoAlertaPendente = 0;
+
+    function desbloquearAudio() {
+        try {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === "suspended") audioCtx.resume();
+        } catch (e) {}
+    }
+    document.addEventListener("click", desbloquearAudio, { once: true });
+
+    function alternarSom() {
+        somAtivo = !somAtivo;
+        const btn = document.getElementById("btnSom");
+        if (somAtivo) {
+            desbloquearAudio();
+            btn.className = "btn-verde";
+            btn.innerText = "🔊 Voz & Som Ativos";
+            mostrarToast("🔊 Alerta sonoro e por voz ativados!");
+        } else {
+            btn.className = "btn-vermelho";
+            btn.innerText = "🔇 Som Desativado";
+            if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+        }
+    }
+
+    function tocarCampainha() {
+        if (!somAtivo) return;
+        try {
+            desbloquearAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+            osc.frequency.setValueAtTime(1174, audioCtx.currentTime + 0.15);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.5);
+        } catch (e) {}
+    }
+
+    function falarAviso(texto) {
+        if (!somAtivo || !("speechSynthesis" in window)) return;
+        try {
+            window.speechSynthesis.cancel();
+            const fala = new SpeechSynthesisUtterance(texto);
+            fala.lang = "pt-BR";
+            fala.rate = 1.0;
+            fala.pitch = 1.0;
+            window.speechSynthesis.speak(fala);
+        } catch (e) {}
+    }
+
+    function dispararAlertaVoz(texto) {
+        tocarCampainha();
+        setTimeout(() => falarAviso(texto), 450);
+    }
+
+    function testarVoz() {
+        somAtivo = true;
+        document.getElementById("btnSom").className = "btn-verde";
+        document.getElementById("btnSom").innerText = "🔊 Voz & Som Ativos";
+        dispararAlertaVoz("Novo pedido! Pedido aguardando aceite.");
+    }
+
+    // Repete o alerta a cada X minutos se houver pedido "Recebido" aguardando aceite
+    setInterval(() => {
+        if (!somAtivo) return;
+        const pendentes = Object.values(PEDIDOS_CACHE).filter(p => p.status === "Recebido");
+        if (pendentes.length === 0) {
+            ultimoAlertaPendente = 0;
+            return;
+        }
+        const intervaloMs = (parseInt(inputMinutosAlerta.value, 10) || 3) * 60 * 1000;
+        const agora = Date.now();
+        if (ultimoAlertaPendente === 0) {
+            ultimoAlertaPendente = agora;
+        } else if (agora - ultimoAlertaPendente >= intervaloMs) {
+            ultimoAlertaPendente = agora;
+            dispararAlertaVoz("Atenção! Pedido ainda aguardando aceite.");
+            mostrarToast(`⏰ Lembrete: ${pendentes.length} pedido(s) aguardando aceite!`);
+        }
+    }, 15000);
+
     let lojaAbertaAtual = true;
-    let somAtivo = false;
+    let expedienteAtual = null;
     let ultimoIdVisto = 0;
     let primeiraCarga = true;
-    let audioCtx = null;
     let PEDIDOS_CACHE = {};
     let ENTREGADORES_CACHE = [];
     let FAIXAS_CACHE = [];
     let PRODUTOS_CACHE = [];
     let fotoBase64Atual = "";
 
-    const fmt = v => "R$ " + Number(v).toFixed(2).replace(".", ",");
     const hoje = new Date();
     document.getElementById("filtroMes").value = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
 
@@ -305,29 +452,55 @@
         const r = await fetch("/api/admin/loja-status");
         const d = await r.json();
         lojaAbertaAtual = d.loja_aberta;
+        expedienteAtual = d.expediente;
         atualizarBotaoLoja();
     }
 
     function atualizarBotaoLoja() {
         const btn = document.getElementById("btnStatusLoja");
+        const info = document.getElementById("infoExpediente");
+
         if (lojaAbertaAtual) {
-            btn.className = "btn-verde";
-            btn.innerText = "🟢 Loja Aberta (Fechar)";
-        } else {
             btn.className = "btn-vermelho";
-            btn.innerText = "🔴 Loja Fechada (Abrir)";
+            btn.innerText = "🔴 Encerrar Expediente";
+            if (expedienteAtual && expedienteAtual.inicio_hora) {
+                info.innerText = `🟢 Aberto às ${expedienteAtual.inicio_hora}`;
+                info.style.display = "inline-block";
+            } else {
+                info.innerText = "🟢 Expediente em andamento";
+                info.style.display = "inline-block";
+            }
+        } else {
+            btn.className = "btn-verde";
+            btn.innerText = "🟢 Iniciar Expediente";
+            if (expedienteAtual && expedienteAtual.fim_hora) {
+                info.innerText = `🕒 Último: ${expedienteAtual.inicio_hora} às ${expedienteAtual.fim_hora} (${fmtMinutos(expedienteAtual.duracao_minutos)})`;
+                info.style.display = "inline-block";
+            } else {
+                info.style.display = "none";
+            }
         }
     }
 
     async function alternarStatusLoja() {
+        desbloquearAudio();
         const novo = !lojaAbertaAtual;
-        await fetch("/api/admin/loja-status", {
+        const r = await fetch("/api/admin/loja-status", {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ aberta: novo })
         });
-        lojaAbertaAtual = novo;
+        const d = await r.json();
+        lojaAbertaAtual = d.loja_aberta;
+        expedienteAtual = d.expediente;
         atualizarBotaoLoja();
-        mostrarToast(novo ? "🟢 Loja ABERTA para pedidos!" : "🔴 Loja FECHADA para pedidos!", !novo);
+
+        if (novo) {
+            mostrarToast("🟢 Expediente iniciado! Loja aberta e som liberado.");
+            tocarCampainha();
+        } else {
+            const dur = expedienteAtual ? ` (${fmtMinutos(expedienteAtual.duracao_minutos)})` : "";
+            mostrarToast(`🔴 Expediente encerrado${dur}. Horário salvo no relatório!`, true);
+        }
     }
 
     function mostrarToast(msg, erro = false) {
@@ -369,30 +542,6 @@
         document.getElementById("areaPreviewFoto").style.display = "none";
     }
 
-    function ativarSom() {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        somAtivo = true;
-        const btn = document.getElementById("btnSom");
-        btn.className = "btn-verde";
-        btn.innerText = "🔔 Alerta Sonoro Ativo";
-        tocarCampainha();
-    }
-
-    function tocarCampainha() {
-        if (!somAtivo || !audioCtx) return;
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
-        osc.frequency.setValueAtTime(1174, audioCtx.currentTime + 0.15);
-        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.5);
-    }
-
     function trocarAba(aba) {
         document.getElementById("abaPedidos").style.display = aba === "pedidos" ? "block" : "none";
         document.getElementById("abaFinanceiro").style.display = aba === "financeiro" ? "block" : "none";
@@ -431,8 +580,9 @@
         if (pedidos.length > 0) {
             const maiorId = pedidos[0].id;
             if (!primeiraCarga && maiorId > ultimoIdVisto) {
-                tocarCampainha();
                 novosRecebidos = pedidos.filter(p => p.id > ultimoIdVisto && p.status === "Recebido");
+                ultimoAlertaPendente = Date.now();
+                dispararAlertaVoz("Novo pedido! Pedido aguardando aceite.");
             }
             ultimoIdVisto = maiorId;
         }
@@ -604,11 +754,24 @@
         document.getElementById("kpiQtdNaoPago").innerText = `${d.qtd_nao_pago} pedidos pendentes`;
         document.getElementById("kpiCancelado").innerText = fmt(d.total_cancelado);
         document.getElementById("kpiQtdCancelado").innerText = `${d.qtd_cancelado} cancelados`;
+        document.getElementById("kpiHoras").innerText = fmtMinutos(d.total_minutos_abertos);
+        document.getElementById("kpiQtdExp").innerText = `${(d.expedientes || []).length} expedientes registrados`;
 
         const formas = Object.entries(d.por_forma_pagamento);
         document.getElementById("resumoFormas").innerHTML = formas.length
             ? formas.map(([f, v]) => `<div style="background:#141414; padding:8px 14px; border-radius:8px; border:1px solid #333;"><strong>${f}:</strong> <span style="color:#4cd964;">${fmt(v)}</span></div>`).join("")
             : "<span style='color:#888;'>Nenhuma venda paga registrada neste mês ainda.</span>";
+
+        document.getElementById("tabelaExpedientes").innerHTML = (d.expedientes && d.expedientes.length)
+            ? d.expedientes.map(e => `
+                <tr>
+                    <td>${e.data}</td>
+                    <td>${e.inicio_hora}</td>
+                    <td>${e.fim_hora ? e.fim_hora : '<span style="color:#4cd964;">Em andamento</span>'}</td>
+                    <td><strong>${e.fim_hora ? fmtMinutos(e.duracao_minutos) : '—'}</strong></td>
+                </tr>
+            `).join("")
+            : `<tr><td colspan="4" style="text-align:center; color:#888;">Nenhum expediente encerrado em ${mes}.</td></tr>`;
 
         document.getElementById("tabelaHistorico").innerHTML = d.pedidos.length
             ? d.pedidos.map(p => `
