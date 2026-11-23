@@ -30,12 +30,12 @@
         }
         .btn-conta {
             background: #1f1f1f; color: var(--amarelo); border: 1px solid var(--amarelo);
-            padding: 5px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer;
+            padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer;
         }
         .btn-insta {
             display: inline-flex; align-items: center; gap: 6px;
             background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
-            color: #fff; text-decoration: none; padding: 5px 14px; border-radius: 20px;
+            color: #fff; text-decoration: none; padding: 6px 14px; border-radius: 20px;
             font-size: 13px; font-weight: bold; border: none; cursor: pointer;
         }
 
@@ -52,16 +52,21 @@
         .container { max-width: 720px; margin: 0 auto; padding: 12px 16px; }
         .prod-card {
             background: var(--card); border: 1px solid #2a2a2a; border-radius: 12px;
-            padding: 14px; margin-bottom: 12px; display: flex; justify-content: space-between;
+            padding: 12px; margin-bottom: 12px; display: flex; justify-content: space-between;
             align-items: center; gap: 12px; cursor: pointer; transition: 0.2s;
         }
         .prod-card:hover { border-color: var(--amarelo); }
+        .prod-thumb {
+            width: 82px; height: 82px; object-fit: cover; border-radius: 10px;
+            flex-shrink: 0; border: 1px solid #333; background: #111;
+        }
+        .prod-info { flex: 1; }
         .prod-info h3 { font-size: 16px; margin-bottom: 4px; color: #fff; }
         .prod-info p { font-size: 13px; color: var(--cinza); margin-bottom: 8px; line-height: 1.3; }
         .prod-preco { color: var(--amarelo); font-weight: 800; font-size: 16px; }
         .btn-add-mini {
             background: var(--amarelo); color: #000; border: none; border-radius: 8px;
-            padding: 8px 14px; font-weight: bold; cursor: pointer;
+            padding: 8px 14px; font-weight: bold; cursor: pointer; flex-shrink: 0;
         }
 
         .barra-carrinho {
@@ -159,7 +164,7 @@
     <img src="/logo" alt="{{ nome_loja }}" class="logo-destaque">
     <div class="topo-acoes">
         <div class="status-pill">● Aberto para pedidos</div>
-        <button class="btn-conta" id="btnMinhaConta" onclick="abrirModalConta()">👤 Fazer Login</button>
+        <button class="btn-conta" id="btnMinhaConta" onclick="abrirModalConta()">👤 Faça login para efetuar seu pedido</button>
         <a href="https://www.instagram.com/psiuburg?knvt=aWxnNmx1b3F1MWV3" target="_blank" class="btn-insta">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
@@ -196,13 +201,13 @@
 <div class="modal-bg" id="modalConta">
     <div class="modal-box">
         <div class="modal-header">
-            <h2 id="tituloModalConta" style="color: var(--amarelo);">👤 Fazer Login</h2>
+            <h2 id="tituloModalConta" style="color: var(--amarelo);">👤 Faça login para pedir</h2>
             <button class="btn-fechar" onclick="fecharModal('modalConta')">✕</button>
         </div>
 
         <div id="telaLogin">
             <p style="font-size:13px; color:var(--cinza); margin-bottom:12px;">
-                Entre com seu CPF e senha para selecionar seu endereço de entrega.
+                Faça login com seu CPF e senha para efetuar seu pedido e escolher o endereço de entrega.
             </p>
             <label>Seu CPF:</label>
             <input id="loginCpf" placeholder="000.000.000-00" maxlength="14" oninput="mascaraCPF(this)">
@@ -310,6 +315,7 @@
             <h2 id="mpNome" style="color: var(--amarelo);"></h2>
             <button class="btn-fechar" onclick="fecharModal('modalProduto')">✕</button>
         </div>
+        <img id="mpImg" src="" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; margin-bottom:12px; display:none;">
         <p id="mpDesc" style="color: var(--cinza); font-size: 14px; margin-bottom: 12px;"></p>
 
         <div id="areaAdicionaisProduto">
@@ -552,7 +558,7 @@
 
     function carregarClienteLocal() {
         const c = obterClienteSalvo();
-        if (!c) { document.getElementById("btnMinhaConta").innerText = "👤 Fazer Login"; return; }
+        if (!c) { document.getElementById("btnMinhaConta").innerText = "👤 Faça login para efetuar seu pedido"; return; }
         document.getElementById("ckNome").value = c.nome || "";
         document.getElementById("ckWhats").value = c.whatsapp || "";
         aplicarEnderecoNoCheckout(c);
@@ -564,7 +570,7 @@
             document.getElementById(id).style.display = "none";
         });
         const mapa = {
-            login: ["telaLogin", "👤 Fazer Login"],
+            login: ["telaLogin", "👤 Faça login para pedir"],
             cadastro: ["telaCadastro", "📝 Criar Cadastro"],
             enderecos: ["telaEnderecos", "📍 Onde vamos entregar?"],
             novoEndereco: ["telaNovoEndereco", "➕ Novo Endereço"],
@@ -790,6 +796,7 @@
         const lista = categoriaAtual === "Todos" ? DADOS.produtos : DADOS.produtos.filter(p => p.categoria === categoriaAtual);
         document.getElementById("listaProdutos").innerHTML = lista.map(p => `
             <div class="prod-card" onclick="abrirProduto(${p.id})">
+                ${p.imagem_url ? `<img src="${p.imagem_url}" alt="${p.nome}" class="prod-thumb">` : ''}
                 <div class="prod-info">
                     <h3>${p.nome}</h3>
                     <p>${p.descricao || ""}</p>
@@ -807,6 +814,14 @@
         document.getElementById("mpDesc").innerText = produtoSelecionado.descricao || "";
         document.getElementById("mpObs").value = "";
         document.getElementById("mpQtd").innerText = "1";
+
+        const imgEl = document.getElementById("mpImg");
+        if (produtoSelecionado.imagem_url) {
+            imgEl.src = produtoSelecionado.imagem_url;
+            imgEl.style.display = "block";
+        } else {
+            imgEl.style.display = "none";
+        }
 
         const ehBebida = produtoSelecionado.categoria === "Bebidas";
         document.getElementById("areaAdicionaisProduto").style.display = ehBebida ? "none" : "block";
