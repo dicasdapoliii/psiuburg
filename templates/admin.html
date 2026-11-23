@@ -116,7 +116,7 @@
             background: #111; color: #fff; border: 1px solid #444; padding: 8px 10px; border-radius: 8px;
         }
 
-        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 14px 0 20px; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(195px, 1fr)); gap: 12px; margin: 14px 0 20px; }
         .kpi-card { background: var(--card); border: 1px solid #333; border-radius: 12px; padding: 16px; }
         .kpi-card small { color: #aaa; font-size: 12px; }
         .kpi-valor { font-size: 24px; font-weight: 900; margin-top: 6px; }
@@ -175,6 +175,7 @@
 
 <div class="abas">
     <button class="aba-btn ativa" id="tabPedidosBtn" onclick="trocarAba('pedidos')">📋 Pedidos ao Vivo</button>
+    <button class="aba-btn" id="tabCustosBtn" onclick="trocarAba('custos')">💸 Custos</button>
     <button class="aba-btn" id="tabFinanceiroBtn" onclick="trocarAba('financeiro')">💰 Fluxo de Caixa & Balanço</button>
     <button class="aba-btn" id="tabGestaoBtn" onclick="trocarAba('gestao')">⚙️ Cardápio, Taxas & Entregadores</button>
 </div>
@@ -184,7 +185,50 @@
     <div class="grid-pedidos" id="listaPedidos">Carregando pedidos...</div>
 </div>
 
-<!-- ABA 2: FLUXO DE CAIXA, BALANÇO ANUAL E POR PERÍODO -->
+<!-- ABA 2: CUSTOS / COMPRAS DE INGREDIENTES -->
+<div id="abaCustos" style="display:none;">
+    <div class="painel-form" id="boxFormCusto">
+        <h3 style="color:var(--amarelo); margin-bottom:6px;" id="tituloFormCusto">💸 Lançar Custo / Compra de Ingredientes</h3>
+        <p style="font-size:13px; color:#aaa; margin-bottom:10px;">
+            Registre suas compras do dia (mussarela, presunto, pão, carne, embalagens, gás) para o sistema calcular seu <strong>Lucro Real</strong> no Fluxo de Caixa.
+        </p>
+        <input type="hidden" id="cEditId" value="">
+        <label style="font-size:13px; color:#ccc;">Data da Compra:</label>
+        <input id="cData" type="date">
+        <label style="font-size:13px; color:#ccc;">O que foi comprado? (Descrição):</label>
+        <input id="cDesc" placeholder="Ex: 1 kg de mussarela, 50 pães brioche, 2 kg de bacon...">
+        <label style="font-size:13px; color:#ccc;">Categoria:</label>
+        <select id="cCat">
+            <option value="Ingredientes">🧀 Ingredientes</option>
+            <option value="Bebidas (Estoque)">🥤 Bebidas (Estoque)</option>
+            <option value="Embalagens">📦 Embalagens</option>
+            <option value="Gás / Energia / Água">🔥 Gás / Energia / Água</option>
+            <option value="Entregador / Frete">🛵 Entregador / Frete</option>
+            <option value="Outros">📌 Outros</option>
+        </select>
+        <label style="font-size:13px; color:#ccc;">Valor Gasto (R$):</label>
+        <input id="cValor" type="number" step="0.01" placeholder="Ex: 48.50">
+        <div style="display:flex; gap:8px;">
+            <button class="btn-amarelo" id="btnSalvarCusto" onclick="salvarCusto()">💾 Salvar Custo</button>
+            <button class="btn-cinza" id="btnCancelarCusto" style="display:none;" onclick="cancelarEdicaoCusto()">Cancelar</button>
+        </div>
+    </div>
+
+    <div class="painel-form" style="max-width:100%;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <h3 style="color:var(--amarelo);">📋 Custos Lançados no Mês:</h3>
+                <input type="month" id="filtroMesCustos" onchange="carregarCustos()" style="width:auto; margin:0; padding:6px 10px;">
+            </div>
+            <div style="font-size:16px; font-weight:900; color:#ff6b6b;">
+                Total Gasto no Mês: <span id="totalCustosMes">R$ 0,00</span>
+            </div>
+        </div>
+        <div id="listaCustosMes">Carregando custos...</div>
+    </div>
+</div>
+
+<!-- ABA 3: FLUXO DE CAIXA, BALANÇO ANUAL E LUCRO REAL -->
 <div id="abaFinanceiro" style="display:none;">
     <div class="filtros-fin">
         <label style="font-weight:bold; font-size:13px;">De:</label>
@@ -198,13 +242,23 @@
 
     <div class="kpi-grid">
         <div class="kpi-card" style="border-top:4px solid var(--verde);">
-            <small>✅ VENDAS PAGAS (GANHOS NO PERÍODO)</small>
+            <small>✅ VENDAS PAGAS (ENTROU)</small>
             <div class="kpi-valor" style="color:#4cd964;" id="kpiPago">R$ 0,00</div>
             <small id="kpiQtdPago">0 pedidos</small>
         </div>
+        <div class="kpi-card" style="border-top:4px solid #ff5252;">
+            <small>💸 CUSTOS (GASTOS)</small>
+            <div class="kpi-valor" style="color:#ff6b6b;" id="kpiCustos">R$ 0,00</div>
+            <small id="kpiQtdCustos">0 lançamentos</small>
+        </div>
         <div class="kpi-card" style="border-top:4px solid var(--amarelo);">
+            <small>📈 LUCRO REAL (ENTROU - CUSTOS)</small>
+            <div class="kpi-valor" style="color:var(--amarelo);" id="kpiLucro">R$ 0,00</div>
+            <small>Resultado líquido no período</small>
+        </div>
+        <div class="kpi-card" style="border-top:4px solid #fd7e14;">
             <small>⏳ NÃO PAGOS / A RECEBER</small>
-            <div class="kpi-valor" style="color:var(--amarelo);" id="kpiNaoPago">R$ 0,00</div>
+            <div class="kpi-valor" style="color:#ffb74d;" id="kpiNaoPago">R$ 0,00</div>
             <small id="kpiQtdNaoPago">0 pedidos</small>
         </div>
         <div class="kpi-card" style="border-top:4px solid var(--vermelho);">
@@ -229,8 +283,8 @@
         <table>
             <thead>
                 <tr>
-                    <th>Mês/Ano</th><th>Pedidos Pagos</th><th>Ganhos (Pagos)</th>
-                    <th>A Receber</th><th>Cancelados</th><th>Tempo Aberto</th>
+                    <th>Mês/Ano</th><th>Pedidos Pagos</th><th>Vendas Pagas</th>
+                    <th>Custos</th><th>Lucro Real</th><th>Cancelados</th><th>Tempo Aberto</th>
                 </tr>
             </thead>
             <tbody id="tabelaResumoMensal"></tbody>
@@ -263,7 +317,7 @@
     </div>
 </div>
 
-<!-- ABA 3: CARDAPIO, TAXAS, ENTREGADORES E SEGURANCA -->
+<!-- ABA 4: CARDAPIO, TAXAS, ENTREGADORES E SEGURANCA -->
 <div id="abaGestao" style="display:none;">
     <div class="painel-form" id="boxFormEntregador">
         <h3 style="color:var(--amarelo); margin-bottom:6px;" id="tituloFormEnt">🛵 Cadastro de Entregadores (Motoboys)</h3>
@@ -423,6 +477,10 @@
         const [ano, mes] = String(ma).split("-");
         return mes && ano ? `${mes}/${ano}` : ma;
     };
+    const fmtDataBR = d => {
+        const [ano, mes, dia] = String(d || "").split("-");
+        return dia && mes && ano ? `${dia}/${mes}/${ano}` : d;
+    };
 
     let somAtivo = true;
     let audioCtx = null;
@@ -519,12 +577,17 @@
     let ENTREGADORES_CACHE = [];
     let FAIXAS_CACHE = [];
     let PRODUTOS_CACHE = [];
+    let CUSTOS_CACHE = [];
     let fotoBase64Atual = "";
 
     const hoje = new Date();
     const mesAtualStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
+    const hojeIso = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
+
     document.getElementById("filtroMesInicio").value = mesAtualStr;
     document.getElementById("filtroMesFim").value = mesAtualStr;
+    document.getElementById("filtroMesCustos").value = mesAtualStr;
+    document.getElementById("cData").value = hojeIso;
 
     function definirPeriodoMesAtual() {
         document.getElementById("filtroMesInicio").value = mesAtualStr;
@@ -635,13 +698,99 @@
 
     function trocarAba(aba) {
         document.getElementById("abaPedidos").style.display = aba === "pedidos" ? "block" : "none";
+        document.getElementById("abaCustos").style.display = aba === "custos" ? "block" : "none";
         document.getElementById("abaFinanceiro").style.display = aba === "financeiro" ? "block" : "none";
         document.getElementById("abaGestao").style.display = aba === "gestao" ? "block" : "none";
+
         document.getElementById("tabPedidosBtn").classList.toggle("ativa", aba === "pedidos");
+        document.getElementById("tabCustosBtn").classList.toggle("ativa", aba === "custos");
         document.getElementById("tabFinanceiroBtn").classList.toggle("ativa", aba === "financeiro");
         document.getElementById("tabGestaoBtn").classList.toggle("ativa", aba === "gestao");
+
+        if (aba === "custos") carregarCustos();
         if (aba === "financeiro") carregarFinanceiro();
         if (aba === "gestao") carregarGestao();
+    }
+
+    // ==========================================
+    // GESTÃO DE CUSTOS
+    // ==========================================
+    async function carregarCustos() {
+        const mes = document.getElementById("filtroMesCustos").value || mesAtualStr;
+        const r = await fetch(`/api/admin/custos?mes=${mes}`);
+        const d = await r.json();
+        CUSTOS_CACHE = d.custos || [];
+        document.getElementById("totalCustosMes").innerText = fmt(d.total_mes || 0);
+
+        document.getElementById("listaCustosMes").innerHTML = CUSTOS_CACHE.length
+            ? CUSTOS_CACHE.map(c => `
+                <div class="linha-item">
+                    <div>
+                        <span style="color:var(--amarelo); font-weight:bold;">${fmtDataBR(c.data)}</span> •
+                        <strong>${c.descricao}</strong>
+                        <span style="color:#aaa; font-size:12px;">(${c.categoria})</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <strong style="color:#ff6b6b;">- ${fmt(c.valor)}</strong>
+                        <button class="btn-azul" onclick="editarCusto(${c.id})">✏️ Editar</button>
+                        <button class="btn-vermelho" onclick="delCusto(${c.id})">✕</button>
+                    </div>
+                </div>
+            `).join("")
+            : "<p style='color:#888; font-size:13px;'>Nenhum custo lançado neste mês ainda.</p>";
+    }
+
+    function editarCusto(id) {
+        const c = CUSTOS_CACHE.find(x => x.id === id);
+        if (!c) return;
+        document.getElementById("cEditId").value = c.id;
+        document.getElementById("cData").value = c.data;
+        document.getElementById("cDesc").value = c.descricao;
+        document.getElementById("cCat").value = c.categoria;
+        document.getElementById("cValor").value = c.valor;
+        document.getElementById("tituloFormCusto").innerText = `✏️ Editando Custo: ${c.descricao}`;
+        document.getElementById("btnSalvarCusto").innerText = "💾 Salvar Alterações";
+        document.getElementById("btnCancelarCusto").style.display = "inline-block";
+        document.getElementById("boxFormCusto").scrollIntoView({ behavior: "smooth" });
+    }
+
+    function cancelarEdicaoCusto() {
+        document.getElementById("cEditId").value = "";
+        document.getElementById("cData").value = hojeIso;
+        document.getElementById("cDesc").value = "";
+        document.getElementById("cValor").value = "";
+        document.getElementById("tituloFormCusto").innerText = "💸 Lançar Custo / Compra de Ingredientes";
+        document.getElementById("btnSalvarCusto").innerText = "💾 Salvar Custo";
+        document.getElementById("btnCancelarCusto").style.display = "none";
+    }
+
+    async function salvarCusto() {
+        const editId = document.getElementById("cEditId").value;
+        const data = document.getElementById("cData").value || hojeIso;
+        const descricao = document.getElementById("cDesc").value.trim();
+        const categoria = document.getElementById("cCat").value;
+        const valor = document.getElementById("cValor").value;
+
+        if (!descricao || !valor) return alert("Preencha a descrição e o valor gasto!");
+
+        const url = editId ? `/api/admin/custos/${editId}` : "/api/admin/custos";
+        const method = editId ? "PUT" : "POST";
+        await fetch(url, {
+            method, headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ data, descricao, categoria, valor })
+        });
+        document.getElementById("filtroMesCustos").value = data.slice(0, 7);
+        cancelarEdicaoCusto();
+        carregarCustos();
+        mostrarToast("✅ Custo salvo com sucesso! Já foi abatido no Fluxo de Caixa.");
+    }
+
+    async function delCusto(id) {
+        if (confirm("Excluir este lançamento de custo?")) {
+            await fetch(`/api/admin/custos/${id}`, { method: "DELETE" });
+            carregarCustos();
+            mostrarToast("Custo removido.");
+        }
     }
 
     function renderBadgePagamento(statusPag) {
@@ -842,6 +991,13 @@
 
         document.getElementById("kpiPago").innerText = fmt(d.total_pago);
         document.getElementById("kpiQtdPago").innerText = `${d.qtd_pago} pedidos pagos`;
+        document.getElementById("kpiCustos").innerText = fmt(d.total_custos || 0);
+        document.getElementById("kpiQtdCustos").innerText = `${d.qtd_custos || 0} lançamentos`;
+
+        const elLucro = document.getElementById("kpiLucro");
+        elLucro.innerText = fmt(d.lucro_real || 0);
+        elLucro.style.color = (d.lucro_real || 0) >= 0 ? "#4cd964" : "#ff5252";
+
         document.getElementById("kpiNaoPago").innerText = fmt(d.total_nao_pago);
         document.getElementById("kpiQtdNaoPago").innerText = `${d.qtd_nao_pago} pedidos pendentes`;
         document.getElementById("kpiCancelado").innerText = fmt(d.total_cancelado);
@@ -859,13 +1015,14 @@
                 <tr>
                     <td><strong>${fmtMesAno(m.mes)}</strong></td>
                     <td>${m.qtd_pago}</td>
-                    <td style="color:#4cd964;"><strong>${fmt(m.pago)}</strong></td>
-                    <td style="color:var(--amarelo);">${fmt(m.nao_pago)}</td>
-                    <td style="color:#ff5252;">${fmt(m.cancelado)} (${m.qtd_cancelado})</td>
+                    <td style="color:#4cd964;">${fmt(m.pago)}</td>
+                    <td style="color:#ff6b6b;">- ${fmt(m.custos || 0)}</td>
+                    <td style="color:${(m.lucro || 0) >= 0 ? '#4cd964' : '#ff5252'};"><strong>${fmt(m.lucro || 0)}</strong></td>
+                    <td style="color:#aaa;">${fmt(m.cancelado)} (${m.qtd_cancelado})</td>
                     <td>${fmtMinutos(m.minutos)}</td>
                 </tr>
             `).join("")
-            : `<tr><td colspan="6" style="text-align:center; color:#888;">Nenhum movimento registrado neste período.</td></tr>`;
+            : `<tr><td colspan="7" style="text-align:center; color:#888;">Nenhum movimento registrado neste período.</td></tr>`;
 
         document.getElementById("tabelaExpedientes").innerHTML = (d.expedientes && d.expedientes.length)
             ? d.expedientes.map(e => `
