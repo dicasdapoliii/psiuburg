@@ -90,6 +90,7 @@
         .badge-pago { background: #144d25; color: #4cd964; padding: 3px 8px; border-radius: 8px; font-size: 12px; font-weight: bold; }
         .badge-aguardando { background: #4a3500; color: #ffc107; padding: 3px 8px; border-radius: 8px; font-size: 12px; font-weight: bold; }
         .badge-entrega { background: #2b2b2b; color: #ccc; padding: 3px 8px; border-radius: 8px; font-size: 12px; }
+        .badge-oferta { background: #ff3d00; color: #fff; padding: 2px 7px; border-radius: 8px; font-size: 11px; font-weight: bold; margin-left: 6px; }
 
         .itens-lista { background: #141414; padding: 10px; border-radius: 8px; margin: 10px 0; font-size: 13px; }
         .acoes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
@@ -107,6 +108,10 @@
         }
         .box-foto-opcoes {
             background: #141414; border: 1px dashed #444; border-radius: 10px;
+            padding: 12px; margin: 8px 0 12px;
+        }
+        .box-oferta-opcoes {
+            background: #261b05; border: 1px solid var(--amarelo); border-radius: 10px;
             padding: 12px; margin: 8px 0 12px;
         }
         .linha-cat-custo { display: flex; gap: 8px; align-items: center; margin: 6px 0 10px; }
@@ -186,7 +191,7 @@
     <button class="aba-btn ativa" id="tabPedidosBtn" onclick="trocarAba('pedidos')">📋 Pedidos ao Vivo</button>
     <button class="aba-btn" id="tabCustosBtn" onclick="trocarAba('custos')">💸 Custos</button>
     <button class="aba-btn" id="tabFinanceiroBtn" onclick="trocarAba('financeiro')">💰 Fluxo de Caixa & Balanço</button>
-    <button class="aba-btn" id="tabGestaoBtn" onclick="trocarAba('gestao')">⚙️ Cardápio, Taxas & Entregadores</button>
+    <button class="aba-btn" id="tabGestaoBtn" onclick="trocarAba('gestao')">⚙️ Cardápio, Cupons & Entregadores</button>
 </div>
 
 <!-- ABA 1: PEDIDOS -->
@@ -235,7 +240,7 @@
     </div>
 </div>
 
-<!-- ABA 3: FLUXO DE CAIXA, BALANÇO ANUAL E LUCRO REAL -->
+<!-- ABA 3: FLUXO DE CAIXA, BALANÇO ANUAL, LUCRO REAL E RANKING -->
 <div id="abaFinanceiro" style="display:none;">
     <div class="filtros-fin">
         <label style="font-weight:bold; font-size:13px;">De:</label>
@@ -285,6 +290,19 @@
         <div id="resumoFormas" style="display:flex; gap:12px; flex-wrap:wrap; font-size:14px;"></div>
     </div>
 
+    <!-- RANKING DOS MAIS VENDIDOS -->
+    <h3 style="color:var(--amarelo); margin: 14px 0 8px;">🏆 Ranking dos Mais Vendidos no Período</h3>
+    <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>Posição</th><th>Produto</th><th>Qtd. Vendida</th><th>Faturamento Gerado</th>
+                </tr>
+            </thead>
+            <tbody id="tabelaRanking"></tbody>
+        </table>
+    </div>
+
     <h3 style="color:var(--amarelo); margin: 14px 0 8px;">📊 Balanço Mês a Mês no Período</h3>
     <div style="overflow-x:auto;">
         <table>
@@ -324,8 +342,24 @@
     </div>
 </div>
 
-<!-- ABA 4: CARDAPIO, TAXAS, ENTREGADORES E SEGURANCA -->
+<!-- ABA 4: CARDAPIO, CUPONS, TAXAS, ENTREGADORES E SEGURANCA -->
 <div id="abaGestao" style="display:none;">
+    <!-- CUPONS DE DESCONTO -->
+    <div class="painel-form">
+        <h3 style="color:var(--amarelo); margin-bottom:6px;">🎟️ Cupons de Desconto</h3>
+        <p style="font-size:13px; color:#aaa; margin-bottom:10px;">
+            Crie cupons para divulgar no Instagram <strong>@psiuburg</strong> ou no WhatsApp (ex.: <code>PSIU10</code>).
+        </p>
+        <input id="cupCodigo" placeholder="Código do Cupom (ex: PSIU10)" style="text-transform:uppercase;">
+        <select id="cupTipo">
+            <option value="percentual">Desconto em Porcentagem (%)</option>
+            <option value="fixo">Desconto em Valor Fixo (R$)</option>
+        </select>
+        <input id="cupValor" type="number" step="0.50" placeholder="Valor (ex: 10 para 10% ou 5.00 para R$ 5,00)">
+        <button class="btn-amarelo" onclick="salvarCupom()">💾 Criar Cupom</button>
+        <div id="listaAdminCupons" style="margin-top:12px;"></div>
+    </div>
+
     <div class="painel-form" id="boxFormEntregador">
         <h3 style="color:var(--amarelo); margin-bottom:6px;" id="tituloFormEnt">🛵 Cadastro de Entregadores (Motoboys)</h3>
         <p style="font-size:13px; color:#aaa; margin-bottom:10px;">
@@ -364,7 +398,19 @@
             <option value="Bebidas">Bebidas</option>
         </select>
         <input id="pDesc" placeholder="Descrição dos ingredientes">
-        <input id="pPreco" type="number" step="0.01" placeholder="Preço (ex: 29.90)">
+        <input id="pPreco" type="number" step="0.01" placeholder="Preço normal (ex: 29.90)">
+
+        <!-- DESTAQUE: OFERTA DO DIA -->
+        <div class="box-oferta-opcoes">
+            <label style="display:flex; align-items:center; gap:8px; cursor:pointer; color:var(--amarelo); font-weight:bold; font-size:14px;">
+                <input type="checkbox" id="pOfertaDia" style="width:auto; margin:0;" onchange="toggleCampoOferta()">
+                🔥 Destacar este produto como "Oferta do Dia" no topo do cardápio
+            </label>
+            <div id="areaPrecoOferta" style="display:none; margin-top:8px;">
+                <label style="font-size:12px; color:#ccc; display:block;">Preço Promocional em R$ (opcional — deixe vazio para manter o preço normal):</label>
+                <input id="pPrecoOferta" type="number" step="0.01" placeholder="Ex: 24.90">
+            </div>
+        </div>
 
         <!-- FOTO DO PRODUTO: ARQUIVO OU URL -->
         <div class="box-foto-opcoes">
@@ -388,7 +434,7 @@
     </div>
 
     <div class="painel-form">
-        <h3 style="color:var(--amarelo); margin-bottom:10px;">Produtos Cadastrados (Clique em ✏️ Editar para alterar ou colocar foto)</h3>
+        <h3 style="color:var(--amarelo); margin-bottom:10px;">Produtos Cadastrados (Clique em ✏️ Editar para alterar, colocar foto ou Oferta do Dia)</h3>
         <div id="listaAdminProdutos"></div>
     </div>
 
@@ -459,6 +505,11 @@
         }
     }
 
+    function toggleCampoOferta() {
+        document.getElementById("areaPrecoOferta").style.display =
+            document.getElementById("pOfertaDia").checked ? "block" : "none";
+    }
+
     const chkAceiteAuto = document.getElementById("chkAceiteAuto");
     const prefAutoSalva = localStorage.getItem("psiuburg_aceite_auto");
     chkAceiteAuto.checked = prefAutoSalva === null ? true : prefAutoSalva === "1";
@@ -497,7 +548,6 @@
         return dia && mes && ano ? `${dia}/${mes}/${ano}` : d;
     };
 
-    // Atalho rapido para abrir conversa no WhatsApp (Cliente ou Entregador)
     function abrirChatWhatsRapido(fone, textoInicial = "") {
         const limpo = String(fone || "").replace(/\D/g, "");
         if (!limpo) return alert("Número de WhatsApp não encontrado.");
@@ -701,7 +751,6 @@
         setTimeout(() => { el.style.display = "none"; }, 4500);
     }
 
-    // Carregar foto do produto via arquivo local
     function processarFotoProduto(input) {
         const file = input.files[0];
         if (!file) return;
@@ -726,7 +775,6 @@
         reader.readAsDataURL(file);
     }
 
-    // Carregar foto do produto via endereco (URL)
     function processarUrlFotoProduto(url) {
         const limpa = (url || "").trim();
         if (limpa.startsWith("http://") || limpa.startsWith("https://")) {
@@ -761,6 +809,43 @@
         if (aba === "custos") carregarCustos();
         if (aba === "financeiro") carregarFinanceiro();
         if (aba === "gestao") carregarGestao();
+    }
+
+    // ==========================================
+    // CUPONS DE DESCONTO
+    // ==========================================
+    async function salvarCupom() {
+        const codigo = document.getElementById("cupCodigo").value.trim().toUpperCase();
+        const tipo = document.getElementById("cupTipo").value;
+        const valor = document.getElementById("cupValor").value;
+        if (!codigo || !valor) return alert("Preencha o código e o valor do cupom!");
+
+        const r = await fetch("/api/admin/cupons", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ codigo, tipo, valor })
+        });
+        const d = await r.json();
+        if (d.sucesso) {
+            document.getElementById("cupCodigo").value = "";
+            document.getElementById("cupValor").value = "";
+            carregarGestao();
+            mostrarToast(`✅ Cupom ${codigo} criado com sucesso!`);
+        } else {
+            alert(d.erro || "Erro ao criar cupom.");
+        }
+    }
+
+    async function toggleCupom(id) {
+        await fetch(`/api/admin/cupons/${id}/toggle`, { method: "POST" });
+        carregarGestao();
+    }
+
+    async function delCupom(id) {
+        if (confirm("Excluir este cupom?")) {
+            await fetch(`/api/admin/cupons/${id}`, { method: "DELETE" });
+            carregarGestao();
+            mostrarToast("Cupom removido.");
+        }
     }
 
     // ==========================================
@@ -956,6 +1041,7 @@
 
                 <div style="font-size:14px;">
                     <strong>Total: ${fmt(p.total)}</strong> • ${p.forma_pagamento}
+                    ${p.desconto > 0 ? `<span style="color:#4cd964;"> (Cupom ${p.cupom_codigo}: -${fmt(p.desconto)})</span>` : ''}
                     ${p.troco_para ? `<span style="color:var(--amarelo);"> (Troco p/ R$ ${p.troco_para})</span>` : ''}
                 </div>
 
@@ -1097,6 +1183,18 @@
             ? formas.map(([f, v]) => `<div style="background:#141414; padding:8px 14px; border-radius:8px; border:1px solid #333;"><strong>${f}:</strong> <span style="color:#4cd964;">${fmt(v)}</span></div>`).join("")
             : "<span style='color:#888;'>Nenhuma venda paga registrada neste período ainda.</span>";
 
+        const medalhas = ["🥇", "🥈", "🥉"];
+        document.getElementById("tabelaRanking").innerHTML = (d.ranking_produtos && d.ranking_produtos.length)
+            ? d.ranking_produtos.map((item, idx) => `
+                <tr>
+                    <td><strong>${medalhas[idx] || (idx + 1) + "º"}</strong></td>
+                    <td><strong>${item.nome}</strong></td>
+                    <td>${item.qtd} un.</td>
+                    <td style="color:#4cd964;"><strong>${fmt(item.receita)}</strong></td>
+                </tr>
+            `).join("")
+            : `<tr><td colspan="4" style="text-align:center; color:#888;">Nenhuma venda registrada neste período.</td></tr>`;
+
         document.getElementById("tabelaResumoMensal").innerHTML = (d.resumo_mensal && d.resumo_mensal.length)
             ? d.resumo_mensal.map(m => `
                 <tr>
@@ -1140,6 +1238,22 @@
         FAIXAS_CACHE = d.faixas;
         ENTREGADORES_CACHE = d.entregadores;
 
+        document.getElementById("listaAdminCupons").innerHTML = (d.cupons && d.cupons.length)
+            ? d.cupons.map(c => `
+                <div class="linha-item">
+                    <div>
+                        <strong style="color:var(--amarelo);">🎟️ ${c.codigo}</strong> —
+                        ${c.tipo === 'percentual' ? `${c.valor}% de desconto` : `${fmt(c.valor)} de desconto`}
+                        ${c.ativo ? '' : '<span style="color:#ff5252;"> [PAUSADO]</span>'}
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="btn-cinza" onclick="toggleCupom(${c.id})">${c.ativo ? 'Pausar' : 'Ativar'}</button>
+                        <button class="btn-vermelho" onclick="delCupom(${c.id})">✕</button>
+                    </div>
+                </div>
+            `).join("")
+            : "<p style='color:#888; font-size:13px;'>Nenhum cupom criado ainda.</p>";
+
         document.getElementById("listaAdminEntregadores").innerHTML = d.entregadores.length
             ? d.entregadores.map(e => `
                 <div class="linha-item">
@@ -1173,7 +1287,11 @@
             <div class="linha-item">
                 <div style="display:flex; align-items:center; gap:10px;">
                     ${p.imagem ? `<img src="${p.imagem}" class="mini-foto-adm">` : ''}
-                    <div><strong>${p.nome}</strong> (${p.categoria}) — ${fmt(p.preco)} ${p.ativo ? '' : '<span style="color:#ff5252;">[PAUSADO]</span>'}</div>
+                    <div>
+                        <strong>${p.nome}</strong> (${p.categoria}) — ${fmt(p.preco)}
+                        ${p.oferta_dia ? `<span class="badge-oferta">🔥 OFERTA${p.preco_oferta ? ' ' + fmt(p.preco_oferta) : ''}</span>` : ''}
+                        ${p.ativo ? '' : '<span style="color:#ff5252;"> [PAUSADO]</span>'}
+                    </div>
                 </div>
                 <div style="display:flex; gap:6px;">
                     <button class="btn-azul" onclick="editarProduto(${p.id})">✏️ Editar</button>
@@ -1290,6 +1408,10 @@
         document.getElementById("pCat").value = p.categoria;
         document.getElementById("pDesc").value = p.descricao || "";
         document.getElementById("pPreco").value = p.preco;
+        document.getElementById("pOfertaDia").checked = p.oferta_dia === 1;
+        document.getElementById("pPrecoOferta").value = p.preco_oferta || "";
+        toggleCampoOferta();
+
         fotoBase64Atual = p.imagem || "";
         document.getElementById("pFotoInput").value = "";
         document.getElementById("pFotoUrl").value = fotoBase64Atual.startsWith("http") ? fotoBase64Atual : "";
@@ -1310,6 +1432,9 @@
         document.getElementById("pNome").value = "";
         document.getElementById("pDesc").value = "";
         document.getElementById("pPreco").value = "";
+        document.getElementById("pOfertaDia").checked = false;
+        document.getElementById("pPrecoOferta").value = "";
+        toggleCampoOferta();
         removerFotoPreview();
         document.getElementById("tituloFormProd").innerText = "+ Novo Produto no Cardápio";
         document.getElementById("btnSalvarProd").innerText = "💾 Salvar Produto";
@@ -1322,10 +1447,14 @@
         const preco = document.getElementById("pPreco").value;
         if (!nome || !preco) return alert("Preencha nome e preço!");
 
+        const oferta_dia = document.getElementById("pOfertaDia").checked;
+        const preco_oferta = oferta_dia ? document.getElementById("pPrecoOferta").value : "";
+
         const payload = {
             nome, categoria: document.getElementById("pCat").value,
             descricao: document.getElementById("pDesc").value.trim(),
-            preco, imagem: fotoBase64Atual
+            preco, imagem: fotoBase64Atual,
+            oferta_dia, preco_oferta
         };
 
         const url = editId ? `/api/admin/produtos/${editId}` : "/api/admin/produtos";
