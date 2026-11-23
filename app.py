@@ -21,12 +21,10 @@ ENDERECO_LOJA = "Avenida Guarapuava, 1735 - Jardim Rondônia, Rondonópolis - MT
 INSTAGRAM_LOJA = "https://www.instagram.com/psiuburg?knvt=aWxnNmx1b3F1MWV3"
 FUSO_HORARIO = timezone(timedelta(hours=-4))  # Horario de MT (UTC-4)
 
-# Coordenadas aproximadas da Av. Guarapuava, 1735 - Jardim Rondonia, Rondonopolis - MT
 LAT_LOJA = -16.4708
 LNG_LOJA = -54.6356
 TAXA_PADRAO_SE_NAO_LOCALIZAR = 8.00
 
-# Configuracao para envio 100% automatico de WhatsApp (configure no Render -> Environment)
 WHATSAPP_API_URL = os.environ.get("WHATSAPP_API_URL", "").strip()
 
 # Banco de Dados Permanente (PostgreSQL no Neon)
@@ -107,7 +105,7 @@ class Entregador(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(120), nullable=False)
     whatsapp = db.Column(db.String(30), nullable=False)
-    padrao = db.Column(db.Integer, default=0)  # 1 = Fixo do dia
+    padrao = db.Column(db.Integer, default=0)
 
     def to_dict(self):
         return {
@@ -196,21 +194,31 @@ class Pedido(db.Model):
         }
 
 
+def get_config(chave, padrao=""):
+    cfg = Configuracao.query.get(chave)
+    return cfg.valor if cfg else padrao
+
+
+def set_config(chave, valor):
+    cfg = Configuracao.query.get(chave)
+    if cfg:
+        cfg.valor = str(valor)
+    else:
+        db.session.add(Configuracao(chave=chave, valor=str(valor)))
+    db.session.commit()
+
+
 def get_loja_aberta():
-    cfg = Configuracao.query.get("loja_aberta")
-    if not cfg:
-        return True
-    return cfg.valor == "1"
+    # Por padrao, a loja nasce FECHADA ("0") ate clicar em Iniciar Expediente
+    return get_config("loja_aberta", "0") == "1"
 
 
 def set_loja_aberta(aberta):
-    cfg = Configuracao.query.get("loja_aberta")
-    val = "1" if aberta else "0"
-    if cfg:
-        cfg.valor = val
-    else:
-        db.session.add(Configuracao(chave="loja_aberta", valor=val))
-    db.session.commit()
+    set_config("loja_aberta", "1" if aberta else "0")
+
+
+def get_senha_admin():
+    return get_config("senha_admin", "1234")
 
 
 def limpar_numeros(valor):
@@ -218,7 +226,6 @@ def limpar_numeros(valor):
 
 
 def enviar_whatsapp_automatico(telefone, mensagem):
-    """Envia mensagem via Green-API com log detalhado e tratamento de DDD brasileiro."""
     if not WHATSAPP_API_URL:
         return False, "WHATSAPP_API_URL não configurada no Render."
     if not telefone:
@@ -230,7 +237,6 @@ def enviar_whatsapp_automatico(telefone, mensagem):
     if not num.startswith("55"):
         num = "55" + num
 
-    # No Brasil (DDD > 28, como 66 em MT), muitos WhatsApps usam JID sem o 9o digito
     if len(num) == 13 and num.startswith("55") and int(num[2:4]) > 28 and num[4] == "9":
         num_sem_9 = num[:4] + num[5:]
     else:
@@ -340,7 +346,9 @@ def init_db():
                 db.session.rollback()
 
         if not Configuracao.query.get("loja_aberta"):
-            db.session.add(Configuracao(chave="loja_aberta", valor="1"))
+            db.session.add(Configuracao(chave="loja_aberta", valor="0"))
+        if not Configuracao.query.get("senha_admin"):
+            db.session.add(Configuracao(chave="senha_admin", valor="1234"))
 
         if Produto.query.count() == 0:
             produtos_iniciais = [
@@ -625,8 +633,42 @@ def consultar_pedido(pedido_id):
 
 
 # ==========================================
-# 5. API DO PAINEL DA COZINHA + EXPEDIENTE + ENTREGADORES
+# 5. API DO PAINEL (LOGIN, SENHA, EXPEDIENTE, ZERAR PEDIDOS)
 # ==========================================
+@app.route("/api/admin/login", methods=["POST"])
+def login_admin():
+    senha = str((request.json or {}).get("senha", "")).strip()
+    if senha == get_senha_admin():
+        return jsonify({"sucesso": True})
+    return jsonify({"sucesso": False, "erro": "Senha incorreta!"}), 401
+
+
+@app.route("/api/admin/alterar-senha", methods=["POST"])
+def alterar_senha_admin():
+    d = request.json or {}
+    atual = str(d.get("senha_atual", "")).strip()
+    nova = str(d.get("nova_senha", "")).strip()
+    if atual != get_senha_admin():
+        return jsonify({"sucesso": False, "erro": "Senha atual incorreta."}), 400
+    if len(nova) < 4:
+        return jsonify({"sucesso": False, "erro": "A nova senha precisa ter pelo menos 4 caracteres."}), 400
+    set_config("senha_admin", nova)
+    return jsonify({"sucesso": True})
+
+
+@app.route("/api/admin/limpar-pedidos", methods=["POST"])
+def limpar_todos_pedidos():
+    Pedido.query.delete()
+    db.session.commit()
+    # Reinicia a numeracao dos pedidos para comecar do #1 novamente
+    try:
+        db.session.execute(db.text("ALTER SEQUENCE pedidos_id_seq RESTART WITH 1"))
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    return jsonify({"sucesso": True})
+
+
 @app.route("/api/admin/loja-status", methods=["GET", "POST"])
 def status_loja_admin():
     if request.method == "POST":
@@ -636,7 +678,6 @@ def status_loja_admin():
         agora_ts = agora_dt.timestamp()
 
         if aberta:
-            # Inicia um novo expediente se nao houver um em aberto
             exp_aberto = Expediente.query.filter_by(fim_hora="").order_by(Expediente.id.desc()).first()
             if not exp_aberto:
                 exp_aberto = Expediente(
@@ -651,7 +692,6 @@ def status_loja_admin():
                 db.session.commit()
             return jsonify({"sucesso": True, "loja_aberta": True, "expediente": exp_aberto.to_dict()})
         else:
-            # Encerra o expediente em aberto e calcula a duracao
             exp_aberto = Expediente.query.filter_by(fim_hora="").order_by(Expediente.id.desc()).first()
             if exp_aberto:
                 exp_aberto.fim_hora = agora_dt.strftime("%H:%M")
