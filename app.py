@@ -62,6 +62,21 @@ class Configuracao(db.Model):
     valor = db.Column(db.Text, default="")
 
 
+class Cupom(db.Model):
+    __tablename__ = "cupons"
+    id = db.Column(db.Integer, primary_key=True)
+    codigo = db.Column(db.String(50), unique=True, nullable=False)
+    tipo = db.Column(db.String(20), default="percentual")  # percentual ou fixo
+    valor = db.Column(db.Float, nullable=False)
+    ativo = db.Column(db.Integer, default=1)
+
+    def to_dict(self):
+        return {
+            "id": self.id, "codigo": self.codigo,
+            "tipo": self.tipo, "valor": self.valor, "ativo": self.ativo
+        }
+
+
 class Expediente(db.Model):
     __tablename__ = "expedientes"
     id = db.Column(db.Integer, primary_key=True)
@@ -106,13 +121,18 @@ class Produto(db.Model):
     descricao = db.Column(db.Text, default="")
     preco = db.Column(db.Float, nullable=False)
     imagem = db.Column(db.Text, default="")
+    oferta_dia = db.Column(db.Integer, default=0)
+    preco_oferta = db.Column(db.Float, nullable=True)
     ativo = db.Column(db.Integer, default=1)
 
     def to_dict(self):
         return {
             "id": self.id, "nome": self.nome, "categoria": self.categoria,
             "descricao": self.descricao, "preco": self.preco,
-            "imagem": self.imagem or "", "ativo": self.ativo
+            "imagem": self.imagem or "",
+            "oferta_dia": self.oferta_dia or 0,
+            "preco_oferta": self.preco_oferta,
+            "ativo": self.ativo
         }
 
 
@@ -201,6 +221,8 @@ class Pedido(db.Model):
     itens_json = db.Column(db.Text, nullable=False)
     subtotal = db.Column(db.Float, nullable=False)
     taxa_entrega = db.Column(db.Float, nullable=False)
+    cupom_codigo = db.Column(db.String(50), default="")
+    desconto = db.Column(db.Float, default=0.0)
     total = db.Column(db.Float, nullable=False)
     status = db.Column(db.String(40), default="Recebido")
     status_pagamento = db.Column(db.String(40), default="Pagar na Entrega")
@@ -214,7 +236,9 @@ class Pedido(db.Model):
             "link_maps": self.link_maps or "", "distancia_km": self.distancia_km or 0.0,
             "forma_pagamento": self.forma_pagamento, "troco_para": self.troco_para,
             "itens": json.loads(self.itens_json),
-            "subtotal": self.subtotal, "taxa_entrega": self.taxa_entrega, "total": self.total,
+            "subtotal": self.subtotal, "taxa_entrega": self.taxa_entrega,
+            "cupom_codigo": self.cupom_codigo or "", "desconto": self.desconto or 0.0,
+            "total": self.total,
             "status": self.status, "status_pagamento": self.status_pagamento,
             "link_pagamento": self.link_pagamento
         }
@@ -363,6 +387,8 @@ def init_db():
 
         colunas_novas = [
             "ALTER TABLE produtos ADD COLUMN imagem TEXT DEFAULT ''",
+            "ALTER TABLE produtos ADD COLUMN oferta_dia INTEGER DEFAULT 0",
+            "ALTER TABLE produtos ADD COLUMN preco_oferta DOUBLE PRECISION",
             "ALTER TABLE clientes ADD COLUMN cpf VARCHAR(20) DEFAULT ''",
             "ALTER TABLE clientes ADD COLUMN senha VARCHAR(100) DEFAULT ''",
             "ALTER TABLE clientes ADD COLUMN enderecos_json TEXT DEFAULT '[]'",
@@ -373,7 +399,9 @@ def init_db():
             "ALTER TABLE clientes ADD COLUMN lat DOUBLE PRECISION",
             "ALTER TABLE clientes ADD COLUMN lng DOUBLE PRECISION",
             "ALTER TABLE pedidos ADD COLUMN link_maps VARCHAR(350) DEFAULT ''",
-            "ALTER TABLE pedidos ADD COLUMN distancia_km DOUBLE PRECISION DEFAULT 0"
+            "ALTER TABLE pedidos ADD COLUMN distancia_km DOUBLE PRECISION DEFAULT 0",
+            "ALTER TABLE pedidos ADD COLUMN cupom_codigo VARCHAR(50) DEFAULT ''",
+            "ALTER TABLE pedidos ADD COLUMN desconto DOUBLE PRECISION DEFAULT 0"
         ]
         for sql in colunas_novas:
             try:
@@ -390,7 +418,7 @@ def init_db():
         if Produto.query.count() == 0:
             produtos_iniciais = [
                 Produto(nome="Psiu! Clássico", categoria="Burgers", descricao="Pão brioche, blend bovino 150g, queijo prato, alface, tomate e molho especial.", preco=24.90),
-                Produto(nome="Psiu! Bacon Duplo", categoria="Burgers", descricao="Pão brioche, 2 blends 150g, duplo cheddar cremoso, bacon crocante e cebola caramelizada.", preco=34.90),
+                Produto(nome="Psiu! Bacon Duplo", categoria="Burgers", descricao="Pão brioche, 2 blends 150g, duplo cheddar cremoso, bacon crocante e cebola caramelizada.", preco=34.90, oferta_dia=1, preco_oferta=29.90),
                 Produto(nome="Psiu! Rei da Chapa", categoria="Burgers", descricao="Pão australiano, blend 180g, queijo coalho grelhado, bacon, rúcula e barbecue artesanal.", preco=36.90),
                 Produto(nome="Combo Psiu! Casal", categoria="Combos", descricao="2 Psiu! Clássicos + 1 Batata Frita Grande com Cheddar e Bacon + 1 Refrigerante 1L.", preco=69.90),
                 Produto(nome="Combo Individual", categoria="Combos", descricao="1 Psiu! Bacon Duplo + Batata Frita Média + Refrigerante Lata 350ml.", preco=46.90),
@@ -438,7 +466,7 @@ def servir_logo():
 
 
 # ==========================================
-# 4. API DO CARDÁPIO, FRETE, CLIENTES E PEDIDOS
+# 4. API DO CARDÁPIO, CUPONS, FRETE, CLIENTES E PEDIDOS
 # ==========================================
 @app.route("/api/dados")
 def api_dados():
@@ -452,6 +480,32 @@ def api_dados():
         "instagram": INSTAGRAM_LOJA,
         "produtos": produtos,
         "adicionais": ADICIONAIS_PADRAO
+    })
+
+
+@app.route("/api/cupons/validar", methods=["POST"])
+def validar_cupom():
+    d = request.json or {}
+    codigo = (d.get("codigo") or "").strip().upper()
+    subtotal = float(d.get("subtotal") or 0)
+    if not codigo:
+        return jsonify({"valido": False, "erro": "Digite um código de cupom."})
+
+    cupom = Cupom.query.filter_by(codigo=codigo, ativo=1).first()
+    if not cupom:
+        return jsonify({"valido": False, "erro": "Cupom inválido ou expirado."})
+
+    if cupom.tipo == "percentual":
+        desconto = round(subtotal * (cupom.valor / 100.0), 2)
+    else:
+        desconto = round(min(subtotal, cupom.valor), 2)
+
+    return jsonify({
+        "valido": True,
+        "codigo": cupom.codigo,
+        "tipo": cupom.tipo,
+        "valor": cupom.valor,
+        "desconto": desconto
     })
 
 
@@ -651,6 +705,8 @@ def criar_pedido():
         itens_json=json.dumps(dados.get("itens", []), ensure_ascii=False),
         subtotal=float(dados.get("subtotal", 0)),
         taxa_entrega=float(dados.get("taxa_entrega", 0)),
+        cupom_codigo=(dados.get("cupom_codigo") or "").strip().upper(),
+        desconto=float(dados.get("desconto", 0)),
         total=float(dados.get("total", 0)),
         status="Recebido",
         status_pagamento=status_pag,
@@ -670,7 +726,7 @@ def consultar_pedido(pedido_id):
 
 
 # ==========================================
-# 5. API DO PAINEL (LOGIN, CUSTOS, CATEGORIAS, EXPEDIENTE, BALANÇO)
+# 5. API DO PAINEL (LOGIN, CUPONS, CUSTOS, EXPEDIENTE, BALANÇO + RANKING)
 # ==========================================
 @app.route("/api/admin/login", methods=["POST"])
 def login_admin():
@@ -702,6 +758,39 @@ def limpar_todos_pedidos():
         db.session.commit()
     except Exception:
         db.session.rollback()
+    return jsonify({"sucesso": True})
+
+
+@app.route("/api/admin/cupons", methods=["GET", "POST"])
+def gerenciar_cupons():
+    if request.method == "POST":
+        d = request.json or {}
+        codigo = (d.get("codigo") or "").strip().upper()
+        tipo = d.get("tipo", "percentual")
+        valor = float(d.get("valor", 0))
+        if not codigo or valor <= 0:
+            return jsonify({"sucesso": False, "erro": "Informe código e valor válidos."}), 400
+        if Cupom.query.filter_by(codigo=codigo).first():
+            return jsonify({"sucesso": False, "erro": "Já existe um cupom com esse código."}), 400
+        db.session.add(Cupom(codigo=codigo, tipo=tipo, valor=valor, ativo=1))
+        db.session.commit()
+        return jsonify({"sucesso": True})
+    return jsonify([c.to_dict() for c in Cupom.query.order_by(Cupom.id.desc()).all()])
+
+
+@app.route("/api/admin/cupons/<int:cupom_id>/toggle", methods=["POST"])
+def alternar_cupom(cupom_id):
+    c = Cupom.query.get_or_404(cupom_id)
+    c.ativo = 0 if c.ativo == 1 else 1
+    db.session.commit()
+    return jsonify({"sucesso": True})
+
+
+@app.route("/api/admin/cupons/<int:cupom_id>", methods=["DELETE"])
+def excluir_cupom(cupom_id):
+    c = Cupom.query.get_or_404(cupom_id)
+    db.session.delete(c)
+    db.session.commit()
     return jsonify({"sucesso": True})
 
 
@@ -929,6 +1018,7 @@ def relatorio_financeiro():
     total_pago = qtd_pago = total_nao_pago = qtd_nao_pago = total_cancelado = qtd_cancelado = 0
     por_forma = {}
     por_mes = {}
+    ranking_map = {}
 
     def garantir_mes(m):
         if m not in por_mes:
@@ -945,16 +1035,31 @@ def relatorio_financeiro():
             qtd_cancelado += 1
             por_mes[p.mes_ano]["cancelado"] += p.total
             por_mes[p.mes_ano]["qtd_cancelado"] += 1
-        elif p.status_pagamento == "Pago":
-            total_pago += p.total
-            qtd_pago += 1
-            por_forma[p.forma_pagamento] = por_forma.get(p.forma_pagamento, 0.0) + p.total
-            por_mes[p.mes_ano]["pago"] += p.total
-            por_mes[p.mes_ano]["qtd_pago"] += 1
         else:
-            total_nao_pago += p.total
-            qtd_nao_pago += 1
-            por_mes[p.mes_ano]["nao_pago"] += p.total
+            # Contabiliza no ranking dos mais vendidos
+            try:
+                itens = json.loads(p.itens_json or "[]")
+                for it in itens:
+                    nome_it = it.get("nome", "Item")
+                    qtd_it = int(it.get("qtd", 1))
+                    val_it = float(it.get("total_item", 0))
+                    if nome_it not in ranking_map:
+                        ranking_map[nome_it] = {"nome": nome_it, "qtd": 0, "receita": 0.0}
+                    ranking_map[nome_it]["qtd"] += qtd_it
+                    ranking_map[nome_it]["receita"] += val_it
+            except Exception:
+                pass
+
+            if p.status_pagamento == "Pago":
+                total_pago += p.total
+                qtd_pago += 1
+                por_forma[p.forma_pagamento] = por_forma.get(p.forma_pagamento, 0.0) + p.total
+                por_mes[p.mes_ano]["pago"] += p.total
+                por_mes[p.mes_ano]["qtd_pago"] += 1
+            else:
+                total_nao_pago += p.total
+                qtd_nao_pago += 1
+                por_mes[p.mes_ano]["nao_pago"] += p.total
 
     for c in custos:
         garantir_mes(c.mes_ano)
@@ -971,6 +1076,7 @@ def relatorio_financeiro():
     lucro_real = total_pago - total_custos
     total_minutos_abertos = sum((e.duracao_minutos or 0) for e in expedientes)
     resumo_mensal = [por_mes[k] for k in sorted(por_mes.keys())]
+    ranking_produtos = sorted(ranking_map.values(), key=lambda x: (-x["qtd"], -x["receita"]))[:10]
 
     return jsonify({
         "mes_inicio": mes_inicio, "mes_fim": mes_fim,
@@ -982,6 +1088,7 @@ def relatorio_financeiro():
         "lucro_real": lucro_real,
         "por_forma_pagamento": por_forma,
         "resumo_mensal": resumo_mensal,
+        "ranking_produtos": ranking_produtos,
         "total_minutos_abertos": total_minutos_abertos,
         "expedientes": [e.to_dict() for e in expedientes],
         "pedidos": [p.to_dict() for p in pedidos]
@@ -1006,10 +1113,14 @@ def webhook_pagamento():
 def gerenciar_produtos():
     if request.method == "POST":
         d = request.json or {}
+        po = d.get("preco_oferta")
         db.session.add(Produto(
             nome=d["nome"], categoria=d["categoria"],
             descricao=d.get("descricao", ""), preco=float(d["preco"]),
-            imagem=d.get("imagem", ""), ativo=1
+            imagem=d.get("imagem", ""),
+            oferta_dia=1 if d.get("oferta_dia") else 0,
+            preco_oferta=float(po) if po not in [None, ""] else None,
+            ativo=1
         ))
         db.session.commit()
         return jsonify({"sucesso": True})
@@ -1017,7 +1128,8 @@ def gerenciar_produtos():
     produtos = [p.to_dict() for p in Produto.query.order_by(Produto.categoria, Produto.nome).all()]
     faixas = [f.to_dict() for f in FaixaEntrega.query.order_by(FaixaEntrega.ate_km.asc()).all()]
     entregadores = [e.to_dict() for e in Entregador.query.order_by(Entregador.nome).all()]
-    return jsonify({"produtos": produtos, "faixas": faixas, "entregadores": entregadores})
+    cupons = [c.to_dict() for c in Cupom.query.order_by(Cupom.id.desc()).all()]
+    return jsonify({"produtos": produtos, "faixas": faixas, "entregadores": entregadores, "cupons": cupons})
 
 
 @app.route("/api/admin/produtos/<int:prod_id>", methods=["PUT", "DELETE"])
@@ -1031,6 +1143,9 @@ def editar_ou_excluir_produto(prod_id):
         p.preco = float(d.get("preco", p.preco))
         if "imagem" in d:
             p.imagem = d["imagem"]
+        p.oferta_dia = 1 if d.get("oferta_dia") else 0
+        po = d.get("preco_oferta")
+        p.preco_oferta = float(po) if po not in [None, ""] else None
         db.session.commit()
         return jsonify({"sucesso": True})
 
@@ -1171,6 +1286,9 @@ TEMPLATE_RECIBO_80MM = """
     <div class="linha"></div>
     <div>Subtotal: R$ {{ "%.2f"|format(p.subtotal) }}</div>
     <div>Taxa Entrega: R$ {{ "%.2f"|format(p.taxa_entrega) }}</div>
+    {% if p.desconto > 0 %}
+    <div>Desconto ({{ p.cupom_codigo }}): - R$ {{ "%.2f"|format(p.desconto) }}</div>
+    {% endif %}
     <div class="total-box">TOTAL: R$ {{ "%.2f"|format(p.total) }}</div>
     <div class="linha"></div>
     <div><span class="negrito">FORMA PAG.:</span> {{ p.forma_pagamento }}</div>
