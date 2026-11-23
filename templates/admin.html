@@ -9,6 +9,13 @@
         * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; }
         body { background: var(--bg); color: #f1f1f1; padding: 16px; }
 
+        #toastAviso {
+            position: fixed; bottom: 20px; right: 20px; z-index: 200;
+            background: #144d25; color: #4cd964; border: 1px solid #28a745;
+            padding: 12px 18px; border-radius: 10px; font-weight: bold; font-size: 14px;
+            display: none; box-shadow: 0 6px 20px rgba(0,0,0,0.5); max-width: 340px;
+        }
+
         #telaBloqueio {
             position: fixed; inset: 0; background: #0e0e0e; z-index: 100;
             display: flex; justify-content: center; align-items: center; padding: 16px;
@@ -20,14 +27,6 @@
         .box-login-adm input {
             width: 100%; padding: 12px; margin: 14px 0; background: #111; border: 1px solid #444;
             color: #fff; border-radius: 8px; font-size: 16px; text-align: center;
-        }
-
-        /* Aviso flutuante de salvamento */
-        #toastAviso {
-            position: fixed; top: 18px; right: 18px; z-index: 200;
-            background: #144d25; color: #fff; border: 1px solid #4cd964;
-            padding: 12px 18px; border-radius: 10px; font-weight: bold; font-size: 14px;
-            box-shadow: 0 6px 20px rgba(0,0,0,0.5); display: none;
         }
 
         .topo {
@@ -90,10 +89,686 @@
             display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;
             padding: 10px; background: #181818; border-radius: 8px; margin-bottom: 6px;
         }
-        .thumb-adm { width: 42px; height: 42px; object-fit: cover; border-radius: 6px; border: 1px solid #444; }
+        .mini-foto-adm { width: 46px; height: 46px; border-radius: 8px; object-fit: cover; border: 1px solid #333; }
 
         .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin: 14px 0 20px; }
         .kpi-card { background: var(--card); border: 1px solid #333; border-radius: 12px; padding: 16px; }
         .kpi-card small { color: #aaa; font-size: 12px; }
         .kpi-valor { font-size: 24px; font-weight: 900; margin-top: 6px; }
-        table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px
+        table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; font-size: 13px; }
+        th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #2b2b2b; }
+        th { background: #252525; color: var(--amarelo); }
+    </style>
+</head>
+<body>
+
+<div id="toastAviso"></div>
+
+<!-- TELA DE SENHA -->
+<div id="telaBloqueio">
+    <div class="box-login-adm">
+        <h2 style="color:var(--amarelo);">🔐 Painel {{ nome_loja }}</h2>
+        <p style="color:#aaa; font-size:13px; margin-top:6px;">Digite a senha do administrador:</p>
+        <input id="inputSenhaAdm" type="password" placeholder="Senha" onkeydown="if(event.key==='Enter') verificarSenha()">
+        <button class="btn-amarelo" style="width:100%; padding:12px;" onclick="verificarSenha()">Entrar no Painel</button>
+        <a href="/" style="display:block; margin-top:14px; color:#888; font-size:13px;">← Voltar para o Cardápio</a>
+    </div>
+</div>
+
+<div class="topo">
+    <h1>🍔 Painel da Cozinha — {{ nome_loja }}</h1>
+    <div class="botoes-topo">
+        <button id="btnSom" class="btn-vermelho" onclick="ativarSom()">🔇 Ativar Alerta Sonoro</button>
+        <button class="btn-cinza" onclick="carregarPedidos()">🔄 Atualizar</button>
+        <a href="/" target="_blank"><button class="btn-amarelo">📱 Ver Cardápio</button></a>
+    </div>
+</div>
+
+<label class="chk-whats-bar">
+    <input type="checkbox" id="chkAutoWhats" style="width:auto;">
+    <span>💬 Abrir janela do WhatsApp Web manualmente (desmarque para usar o envio automático do Green-API)</span>
+</label>
+
+<div class="abas">
+    <button class="aba-btn ativa" id="tabPedidosBtn" onclick="trocarAba('pedidos')">📋 Pedidos ao Vivo</button>
+    <button class="aba-btn" id="tabFinanceiroBtn" onclick="trocarAba('financeiro')">💰 Fluxo de Caixa</button>
+    <button class="aba-btn" id="tabGestaoBtn" onclick="trocarAba('gestao')">⚙️ Cardápio, Taxas & Entregadores</button>
+</div>
+
+<!-- ABA 1: PEDIDOS -->
+<div id="abaPedidos">
+    <div class="grid-pedidos" id="listaPedidos">Carregando pedidos...</div>
+</div>
+
+<!-- ABA 2: FLUXO DE CAIXA -->
+<div id="abaFinanceiro" style="display:none;">
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <label style="font-weight:bold;">Filtrar Mês:</label>
+        <input type="month" id="filtroMes" onchange="carregarFinanceiro()" style="background:#1e1e1e; color:#fff; border:1px solid #444; padding:8px 12px; border-radius:8px;">
+        <button class="btn-amarelo" onclick="carregarFinanceiro()">Atualizar Relatório</button>
+    </div>
+
+    <div class="kpi-grid">
+        <div class="kpi-card" style="border-top:4px solid var(--verde);">
+            <small>✅ VENDAS PAGAS (ENTROU NO CAIXA)</small>
+            <div class="kpi-valor" style="color:#4cd964;" id="kpiPago">R$ 0,00</div>
+            <small id="kpiQtdPago">0 pedidos</small>
+        </div>
+        <div class="kpi-card" style="border-top:4px solid var(--amarelo);">
+            <small>⏳ NÃO PAGOS / A RECEBER</small>
+            <div class="kpi-valor" style="color:var(--amarelo);" id="kpiNaoPago">R$ 0,00</div>
+            <small id="kpiQtdNaoPago">0 pedidos</small>
+        </div>
+        <div class="kpi-card" style="border-top:4px solid var(--vermelho);">
+            <small>❌ PEDIDOS CANCELADOS</small>
+            <div class="kpi-valor" style="color:#ff5252;" id="kpiCancelado">R$ 0,00</div>
+            <small id="kpiQtdCancelado">0 pedidos</small>
+        </div>
+    </div>
+
+    <div class="painel-form" style="max-width:100%;">
+        <h3 style="color:var(--amarelo); margin-bottom:10px;">Entradas Pagas por Forma de Pagamento</h3>
+        <div id="resumoFormas" style="display:flex; gap:12px; flex-wrap:wrap; font-size:14px;"></div>
+    </div>
+
+    <div style="overflow-x:auto;">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th><th>Data/Hora</th><th>Cliente</th><th>Pagamento</th>
+                    <th>Status Pag.</th><th>Status Pedido</th><th>Total</th>
+                </tr>
+            </thead>
+            <tbody id="tabelaHistorico"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- ABA 3: CARDAPIO, TAXAS E ENTREGADORES -->
+<div id="abaGestao" style="display:none;">
+    <!-- ENTREGADORES -->
+    <div class="painel-form" id="boxFormEntregador">
+        <h3 style="color:var(--amarelo); margin-bottom:6px;" id="tituloFormEnt">🛵 Cadastro de Entregadores (Motoboys)</h3>
+        <p style="font-size:13px; color:#aaa; margin-bottom:10px;">
+            Marque um entregador como <strong>⭐ Fixo do Dia</strong> para ele receber o endereço automaticamente no WhatsApp assim que você aceitar o pedido!
+        </p>
+        <input type="hidden" id="eEditId" value="">
+        <input id="eNome" placeholder="Nome do Entregador (ex: João Motoboy)">
+        <input id="eWhats" placeholder="WhatsApp com DDD (ex: 66999998888)">
+        <div style="display:flex; gap:8px;">
+            <button class="btn-amarelo" id="btnSalvarEnt" onclick="salvarEntregador()">💾 Salvar Entregador</button>
+            <button class="btn-cinza" id="btnCancelarEnt" style="display:none;" onclick="cancelarEdicaoEnt()">Cancelar</button>
+        </div>
+        <div id="listaAdminEntregadores" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- TAXAS POR KM -->
+    <div class="painel-form" id="boxFormFaixa">
+        <h3 style="color:var(--amarelo); margin-bottom:6px;" id="tituloFormFaixa">📍 Tabela de Taxa de Entrega por Quilometragem</h3>
+        <input type="hidden" id="fEditId" value="">
+        <input id="fKm" type="number" step="0.5" placeholder="Até quantos KM? (ex: 3)">
+        <input id="fTaxa" type="number" step="0.50" placeholder="Valor da taxa em R$ (ex: 6.00)">
+        <div style="display:flex; gap:8px;">
+            <button class="btn-amarelo" id="btnSalvarFaixa" onclick="salvarFaixa()">💾 Salvar Faixa de KM</button>
+            <button class="btn-cinza" id="btnCancelarFaixa" style="display:none;" onclick="cancelarEdicaoFaixa()">Cancelar</button>
+        </div>
+        <div id="listaAdminFaixas" style="margin-top:12px;"></div>
+    </div>
+
+    <!-- CRIAR / EDITAR PRODUTO COM FOTO -->
+    <div class="painel-form" id="boxFormProduto">
+        <h3 style="color:var(--amarelo); margin-bottom:10px;" id="tituloFormProd">+ Novo Produto no Cardápio</h3>
+        <input type="hidden" id="pEditId" value="">
+        <input id="pNome" placeholder="Nome do lanche (ex: Psiu! Cheddar)">
+        <select id="pCat">
+            <option value="Burgers">Burgers</option>
+            <option value="Combos">Combos</option>
+            <option value="Porções">Porções</option>
+            <option value="Bebidas">Bebidas</option>
+        </select>
+        <input id="pDesc" placeholder="Descrição dos ingredientes">
+        <input id="pPreco" type="number" step="0.01" placeholder="Preço (ex: 29.90)">
+
+        <label style="font-size:13px; color:#ccc; display:block; margin-top:6px;">📷 Foto do Lanche (opcional — será ajustada automaticamente):</label>
+        <input type="file" id="pFotoInput" accept="image/*" onchange="processarFotoProduto(this)">
+        <div id="areaPreviewFoto" style="display:none; align-items:center; gap:10px; margin-bottom:10px;">
+            <img id="pFotoPreview" src="" style="width:70px; height:70px; object-fit:cover; border-radius:10px; border:1px solid var(--amarelo);">
+            <button class="btn-vermelho" type="button" onclick="removerFotoPreview()">Remover Foto</button>
+        </div>
+
+        <div style="display:flex; gap:8px;">
+            <button class="btn-amarelo" id="btnSalvarProd" onclick="salvarProduto()">💾 Salvar Produto</button>
+            <button class="btn-cinza" id="btnCancelarEdicao" style="display:none;" onclick="cancelarEdicaoProduto()">Cancelar Edição</button>
+        </div>
+    </div>
+
+    <div class="painel-form">
+        <h3 style="color:var(--amarelo); margin-bottom:10px;">Produtos Cadastrados (Clique em ✏️ Editar para alterar ou colocar foto)</h3>
+        <div id="listaAdminProdutos"></div>
+    </div>
+</div>
+
+<script>
+    const SENHA_ADMIN = "1234";
+    if (sessionStorage.getItem("psiuburg_adm_ok") === "1") {
+        document.getElementById("telaBloqueio").style.display = "none";
+    }
+
+    function verificarSenha() {
+        if (document.getElementById("inputSenhaAdm").value === SENHA_ADMIN) {
+            sessionStorage.setItem("psiuburg_adm_ok", "1");
+            document.getElementById("telaBloqueio").style.display = "none";
+        } else {
+            alert("Senha incorreta!");
+        }
+    }
+
+    let somAtivo = false;
+    let ultimoIdVisto = 0;
+    let primeiraCarga = true;
+    let audioCtx = null;
+    let PEDIDOS_CACHE = {};
+    let ENTREGADORES_CACHE = [];
+    let FAIXAS_CACHE = [];
+    let PRODUTOS_CACHE = [];
+    let fotoBase64Atual = "";
+
+    const fmt = v => "R$ " + Number(v).toFixed(2).replace(".", ",");
+    const hoje = new Date();
+    document.getElementById("filtroMes").value = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
+
+    function mostrarToast(msg, erro = false) {
+        const el = document.getElementById("toastAviso");
+        el.innerText = msg;
+        el.style.background = erro ? "#4d1414" : "#144d25";
+        el.style.color = erro ? "#ff8a80" : "#4cd964";
+        el.style.borderColor = erro ? "#dc3545" : "#28a745";
+        el.style.display = "block";
+        setTimeout(() => { el.style.display = "none"; }, 4500);
+    }
+
+    function processarFotoProduto(input) {
+        const file = input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            const img = new Image();
+            img.onload = () => {
+                // Redimensiona para miniatura leve (max 320px) para salvar rapido no Neon
+                const canvas = document.createElement("canvas");
+                const max = 320;
+                let w = img.width, h = img.height;
+                if (w > h && w > max) { h = Math.round(h * max / w); w = max; }
+                else if (h > max) { w = Math.round(w * max / h); h = max; }
+                canvas.width = w; canvas.height = h;
+                canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+                fotoBase64Atual = canvas.toDataURL("image/jpeg", 0.78);
+                document.getElementById("pFotoPreview").src = fotoBase64Atual;
+                document.getElementById("areaPreviewFoto").style.display = "flex";
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function removerFotoPreview() {
+        fotoBase64Atual = "";
+        document.getElementById("pFotoInput").value = "";
+        document.getElementById("areaPreviewFoto").style.display = "none";
+    }
+
+    function ativarSom() {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        somAtivo = true;
+        const btn = document.getElementById("btnSom");
+        btn.className = "btn-verde";
+        btn.innerText = "🔔 Alerta Sonoro Ativo";
+        tocarCampainha();
+    }
+
+    function tocarCampainha() {
+        if (!somAtivo || !audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(1174, audioCtx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.5);
+    }
+
+    function trocarAba(aba) {
+        document.getElementById("abaPedidos").style.display = aba === "pedidos" ? "block" : "none";
+        document.getElementById("abaFinanceiro").style.display = aba === "financeiro" ? "block" : "none";
+        document.getElementById("abaGestao").style.display = aba === "gestao" ? "block" : "none";
+        document.getElementById("tabPedidosBtn").classList.toggle("ativa", aba === "pedidos");
+        document.getElementById("tabFinanceiroBtn").classList.toggle("ativa", aba === "financeiro");
+        document.getElementById("tabGestaoBtn").classList.toggle("ativa", aba === "gestao");
+        if (aba === "financeiro") carregarFinanceiro();
+        if (aba === "gestao") carregarGestao();
+    }
+
+    function renderBadgePagamento(statusPag) {
+        if (statusPag === "Pago") return `<span class="badge-pago">✅ PAGO</span>`;
+        if (statusPag === "Aguardando Pagamento") return `<span class="badge-aguardando">⏳ Aguardando Pagamento</span>`;
+        return `<span class="badge-entrega">🛵 ${statusPag}</span>`;
+    }
+
+    function enviarMsgWhatsCliente(fone, texto) {
+        const limpo = String(fone || "").replace(/\D/g, "");
+        if (!limpo) return;
+        const num = limpo.startsWith("55") ? limpo : "55" + limpo;
+        window.open(`https://wa.me/${num}?text=${encodeURIComponent(texto)}`, "_blank");
+    }
+
+    async function carregarEntregadoresCache() {
+        const r = await fetch("/api/admin/entregadores");
+        ENTREGADORES_CACHE = await r.json();
+    }
+
+    async function carregarPedidos() {
+        await carregarEntregadoresCache();
+        const r = await fetch("/api/admin/pedidos");
+        const pedidos = await r.json();
+
+        if (pedidos.length > 0) {
+            const maiorId = pedidos[0].id;
+            if (!primeiraCarga && maiorId > ultimoIdVisto) tocarCampainha();
+            ultimoIdVisto = maiorId;
+        }
+        primeiraCarga = false;
+
+        if (pedidos.length === 0) {
+            document.getElementById("listaPedidos").innerHTML = "<p style='color:#888;'>Nenhum pedido recebido ainda.</p>";
+            return;
+        }
+
+        PEDIDOS_CACHE = {};
+        pedidos.forEach(p => PEDIDOS_CACHE[p.id] = p);
+
+        const opcoesEntregador = ENTREGADORES_CACHE.length
+            ? ENTREGADORES_CACHE.map(e => `<option value="${e.id}" ${e.padrao ? 'selected' : ''}>${e.padrao ? '⭐ ' : ''}${e.nome}</option>`).join("")
+            : `<option value="">(Escolher no WhatsApp)</option>`;
+
+        document.getElementById("listaPedidos").innerHTML = pedidos.map(p => {
+            const classeStatus = p.status.replace(/\s+/g, '');
+            return `
+            <div class="card-pedido status-${classeStatus}">
+                <div class="cab-pedido">
+                    <strong>Pedido #${p.id} • ${p.data_hora.split(' ')[1]}</strong>
+                    <span class="badge">${p.status}</span>
+                </div>
+                <div style="margin-bottom:6px;">
+                    <strong>${p.cliente_nome}</strong> (${p.cliente_whatsapp})
+                    <div style="margin-top:4px;">${renderBadgePagamento(p.status_pagamento)}</div>
+                </div>
+                <div style="font-size:13px; color:#ccc;">
+                    ${p.tipo_entrega === 'Entrega'
+                        ? `🛵 ${p.endereco} ${p.distancia_km ? `(${p.distancia_km} km)` : ''}`
+                        : '🏪 <strong>Retirada no Balcão (Grátis)</strong>'}
+                </div>
+
+                <div class="itens-lista">
+                    ${p.itens.map(it => `
+                        <div style="margin-bottom:4px;">
+                            <strong>${it.qtd}x ${it.nome}</strong> (${fmt(it.total_item)})
+                            ${it.adicionais && it.adicionais.length ? `<div style="color:#aaa; padding-left:10px;">+ ${it.adicionais.map(a=>a.nome).join(', ')}</div>` : ''}
+                            ${it.obs ? `<div style="color:var(--amarelo); padding-left:10px;">Obs: ${it.obs}</div>` : ''}
+                        </div>
+                    `).join("")}
+                </div>
+
+                <div style="font-size:14px;">
+                    <strong>Total: ${fmt(p.total)}</strong> • ${p.forma_pagamento}
+                    ${p.troco_para ? `<span style="color:var(--amarelo);"> (Troco p/ R$ ${p.troco_para})</span>` : ''}
+                </div>
+
+                ${p.tipo_entrega === 'Entrega' ? `
+                <div class="box-entregador-card">
+                    <select id="selEnt_${p.id}">${opcoesEntregador}</select>
+                    <button class="btn-roxo" onclick="enviarEntregador(${p.id})">🛵 Enviar</button>
+                </div>` : ''}
+
+                <div class="acoes">
+                    <button class="btn-amarelo" onclick="imprimir80mm(${p.id})">🖨️ 80mm</button>
+
+                    ${p.status !== 'Cancelado' && p.status_pagamento !== 'Pago' ? `
+                        ${p.forma_pagamento.includes('Link') ? `<button class="btn-ton" onclick="enviarLinkTon(${p.id}, '${p.cliente_whatsapp}', ${p.total})">🔗 Link Ton</button>` : ''}
+                        <button class="btn-verde" onclick="confirmarPago(${p.id})">✅ Pago</button>
+                    ` : ''}
+
+                    ${p.status === 'Recebido' ? `<button class="btn-azul" onclick="mudarStatus(${p.id}, 'Aceito')">👍 Aceitar</button>` : ''}
+                    ${p.status === 'Aceito' ? `<button class="btn-laranja" onclick="mudarStatus(${p.id}, 'Em Preparo')">🔥 Preparar</button>` : ''}
+                    ${p.status === 'Em Preparo' ? `<button class="btn-verde" onclick="mudarStatus(${p.id}, 'Saiu para Entrega')">🛵 Saiu p/ Entrega</button>` : ''}
+                    ${p.status !== 'Concluído' && p.status !== 'Cancelado' ? `<button class="btn-cinza" onclick="mudarStatus(${p.id}, 'Concluído')">✔ Concluir</button>` : ''}
+                    ${p.status !== 'Cancelado' ? `<button class="btn-vermelho" onclick="cancelarPedido(${p.id})">❌</button>` : ''}
+                </div>
+            </div>`;
+        }).join("");
+    }
+
+    async function enviarEntregador(id) {
+        const sel = document.getElementById(`selEnt_${id}`);
+        const entregador_id = sel ? sel.value : "";
+        const r = await fetch(`/api/admin/pedidos/${id}/enviar-entregador`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ entregador_id: entregador_id || null })
+        });
+        const d = await r.json();
+        if (d.enviado_auto) {
+            mostrarToast("✅ Mensagem enviada automaticamente para o entregador!");
+        } else {
+            if (d.detalhe) mostrarToast("⚠️ " + d.detalhe, true);
+            const url = d.whatsapp
+                ? `https://wa.me/${d.whatsapp}?text=${encodeURIComponent(d.mensagem)}`
+                : `https://wa.me/?text=${encodeURIComponent(d.mensagem)}`;
+            window.open(url, "_blank");
+        }
+    }
+
+    async function confirmarPago(id) {
+        const r = await fetch(`/api/admin/pedidos/${id}/pagamento`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status_pagamento: "Pago" })
+        });
+        const d = await r.json();
+        const p = PEDIDOS_CACHE[id];
+        carregarPedidos();
+        if (!d.whats_ok && d.whats_msg) mostrarToast("⚠️ WhatsApp: " + d.whats_msg, true);
+        else mostrarToast("✅ Pagamento confirmado e cliente avisado!");
+
+        if (p && document.getElementById("chkAutoWhats").checked) {
+            enviarMsgWhatsCliente(p.cliente_whatsapp, `Olá ${p.cliente_nome}! ✅ *Pagamento realizado com sucesso!* Recebemos a confirmação do seu pedido #${id} na PSIU! BURG 🍔`);
+        }
+    }
+
+    async function mudarStatus(id, status) {
+        const r = await fetch(`/api/admin/pedidos/${id}/status`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status })
+        });
+        const d = await r.json();
+        const p = PEDIDOS_CACHE[id];
+        carregarPedidos();
+
+        if (!d.whats_ok && d.whats_msg) mostrarToast("⚠️ WhatsApp: " + d.whats_msg, true);
+        else mostrarToast(`✅ Status alterado para "${status}"!`);
+
+        if (p && document.getElementById("chkAutoWhats").checked) {
+            const msgs = {
+                "Aceito": `Olá ${p.cliente_nome}! 👍 *Seu pedido #${id} foi aceito* na PSIU! BURG!`,
+                "Em Preparo": `Olá ${p.cliente_nome}! 🔥 *Seu pedido #${id} está sendo preparado* com todo capricho na chapa! 🍔`,
+                "Saiu para Entrega": `Olá ${p.cliente_nome}! 🛵 *Seu pedido #${id} saiu para entrega!* Já já chega aí! 🍔🔥`
+            };
+            if (msgs[status]) enviarMsgWhatsCliente(p.cliente_whatsapp, msgs[status]);
+        }
+    }
+
+    async function cancelarPedido(id) {
+        if (!confirm(`Tem certeza que deseja cancelar o Pedido #${id}?`)) return;
+        await fetch(`/api/admin/pedidos/${id}/status`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status: "Cancelado" })
+        });
+        carregarPedidos();
+    }
+
+    async function enviarLinkTon(id, fone, total) {
+        const link = prompt(`Cole aqui o Link de Pagamento gerado no app da Ton (Valor: ${fmt(total)}):`);
+        if (!link || !link.trim()) return;
+        await fetch(`/api/admin/pedidos/${id}/pagamento`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ link_pagamento: link.trim() })
+        });
+        carregarPedidos();
+        enviarMsgWhatsCliente(fone, `Olá! Segue o link seguro para pagamento do seu pedido #${id} (${fmt(total)}) na PSIU! BURG 🍔:\n\n${link.trim()}`);
+    }
+
+    function imprimir80mm(id) { window.open(`/imprimir/${id}`, "Impressao80mm", "width=340,height=600"); }
+
+    async function carregarFinanceiro() {
+        const mes = document.getElementById("filtroMes").value;
+        const r = await fetch(`/api/admin/financeiro?mes=${mes}`);
+        const d = await r.json();
+
+        document.getElementById("kpiPago").innerText = fmt(d.total_pago);
+        document.getElementById("kpiQtdPago").innerText = `${d.qtd_pago} pedidos pagos`;
+        document.getElementById("kpiNaoPago").innerText = fmt(d.total_nao_pago);
+        document.getElementById("kpiQtdNaoPago").innerText = `${d.qtd_nao_pago} pedidos pendentes`;
+        document.getElementById("kpiCancelado").innerText = fmt(d.total_cancelado);
+        document.getElementById("kpiQtdCancelado").innerText = `${d.qtd_cancelado} cancelados`;
+
+        const formas = Object.entries(d.por_forma_pagamento);
+        document.getElementById("resumoFormas").innerHTML = formas.length
+            ? formas.map(([f, v]) => `<div style="background:#141414; padding:8px 14px; border-radius:8px; border:1px solid #333;"><strong>${f}:</strong> <span style="color:#4cd964;">${fmt(v)}</span></div>`).join("")
+            : "<span style='color:#888;'>Nenhuma venda paga registrada neste mês ainda.</span>";
+
+        document.getElementById("tabelaHistorico").innerHTML = d.pedidos.length
+            ? d.pedidos.map(p => `
+                <tr>
+                    <td>#${p.id}</td><td>${p.data_hora}</td><td>${p.cliente_nome}</td>
+                    <td>${p.forma_pagamento}</td><td>${renderBadgePagamento(p.status_pagamento)}</td>
+                    <td>${p.status}</td><td><strong>${fmt(p.total)}</strong></td>
+                </tr>
+            `).join("")
+            : `<tr><td colspan="7" style="text-align:center; color:#888;">Nenhum pedido encontrado em ${mes}.</td></tr>`;
+    }
+
+    async function carregarGestao() {
+        const r = await fetch("/api/admin/produtos");
+        const d = await r.json();
+        PRODUTOS_CACHE = d.produtos;
+        FAIXAS_CACHE = d.faixas;
+        ENTREGADORES_CACHE = d.entregadores;
+
+        document.getElementById("listaAdminEntregadores").innerHTML = d.entregadores.length
+            ? d.entregadores.map(e => `
+                <div class="linha-item">
+                    <div>
+                        <strong>${e.nome}</strong> (${e.whatsapp})
+                        ${e.padrao ? '<span class="badge-pago" style="margin-left:6px;">⭐ FIXO DO DIA (AUTO)</span>' : ''}
+                    </div>
+                    <div style="display:flex; gap:6px;">
+                        <button class="${e.padrao ? 'btn-verde' : 'btn-cinza'}" onclick="toggleEntregadorPadrao(${e.id})">
+                            ${e.padrao ? 'Remover Fixo' : '⭐ Definir Fixo'}
+                        </button>
+                        <button class="btn-azul" onclick="editarEntregador(${e.id})">✏️ Editar</button>
+                        <button class="btn-vermelho" onclick="delEntregador(${e.id})">✕</button>
+                    </div>
+                </div>
+            `).join("")
+            : "<p style='color:#888; font-size:13px;'>Nenhum entregador cadastrado ainda.</p>";
+
+        document.getElementById("listaAdminFaixas").innerHTML = d.faixas.map(f => `
+            <div class="linha-item">
+                <div>Até <strong>${f.ate_km} km</strong> — <strong>${fmt(f.taxa)}</strong></div>
+                <div style="display:flex; gap:6px;">
+                    <button class="btn-azul" onclick="editarFaixa(${f.id})">✏️ Editar</button>
+                    <button class="btn-vermelho" onclick="delFaixa(${f.id})">✕</button>
+                </div>
+            </div>
+        `).join("");
+
+        document.getElementById("listaAdminProdutos").innerHTML = d.produtos.map(p => `
+            <div class="linha-item">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    ${p.imagem ? `<img src="${p.imagem}" class="mini-foto-adm">` : ''}
+                    <div><strong>${p.nome}</strong> (${p.categoria}) — ${fmt(p.preco)} ${p.ativo ? '' : '<span style="color:#ff5252;">[PAUSADO]</span>'}</div>
+                </div>
+                <div style="display:flex; gap:6px;">
+                    <button class="btn-azul" onclick="editarProduto(${p.id})">✏️ Editar</button>
+                    <button class="btn-cinza" onclick="toggleProd(${p.id})">${p.ativo ? 'Pausar' : 'Ativar'}</button>
+                    <button class="btn-vermelho" onclick="delProd(${p.id})">✕</button>
+                </div>
+            </div>
+        `).join("");
+    }
+
+    // --- ENTREGADORES (CRIAR / EDITAR) ---
+    function editarEntregador(id) {
+        const e = ENTREGADORES_CACHE.find(x => x.id === id);
+        if (!e) return;
+        document.getElementById("eEditId").value = e.id;
+        document.getElementById("eNome").value = e.nome;
+        document.getElementById("eWhats").value = e.whatsapp;
+        document.getElementById("tituloFormEnt").innerText = `✏️ Editando Entregador: ${e.nome}`;
+        document.getElementById("btnSalvarEnt").innerText = "💾 Salvar Alterações";
+        document.getElementById("btnCancelarEnt").style.display = "inline-block";
+        document.getElementById("boxFormEntregador").scrollIntoView({ behavior: "smooth" });
+    }
+
+    function cancelarEdicaoEnt() {
+        document.getElementById("eEditId").value = "";
+        document.getElementById("eNome").value = "";
+        document.getElementById("eWhats").value = "";
+        document.getElementById("tituloFormEnt").innerText = "🛵 Cadastro de Entregadores (Motoboys)";
+        document.getElementById("btnSalvarEnt").innerText = "💾 Salvar Entregador";
+        document.getElementById("btnCancelarEnt").style.display = "none";
+    }
+
+    async function salvarEntregador() {
+        const editId = document.getElementById("eEditId").value;
+        const nome = document.getElementById("eNome").value.trim();
+        const whatsapp = document.getElementById("eWhats").value.trim();
+        if (!nome || !whatsapp) return alert("Preencha nome e WhatsApp do entregador!");
+
+        const url = editId ? `/api/admin/entregadores/${editId}` : "/api/admin/entregadores";
+        const method = editId ? "PUT" : "POST";
+        await fetch(url, {
+            method, headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nome, whatsapp })
+        });
+        cancelarEdicaoEnt();
+        carregarGestao();
+        mostrarToast("✅ Entregador salvo com sucesso!");
+    }
+
+    async function toggleEntregadorPadrao(id) {
+        await fetch(`/api/admin/entregadores/${id}/padrao`, { method: "POST" });
+        carregarGestao();
+        mostrarToast("✅ Configuração de Entregador Fixo atualizada!");
+    }
+
+    async function delEntregador(id) {
+        if (confirm("Excluir entregador?")) {
+            await fetch(`/api/admin/entregadores/${id}`, { method: "DELETE" });
+            carregarGestao();
+            mostrarToast("Entregador removido.");
+        }
+    }
+
+    // --- FAIXAS DE KM (CRIAR / EDITAR) ---
+    function editarFaixa(id) {
+        const f = FAIXAS_CACHE.find(x => x.id === id);
+        if (!f) return;
+        document.getElementById("fEditId").value = f.id;
+        document.getElementById("fKm").value = f.ate_km;
+        document.getElementById("fTaxa").value = f.taxa;
+        document.getElementById("tituloFormFaixa").innerText = `✏️ Editando Faixa: Até ${f.ate_km} km`;
+        document.getElementById("btnSalvarFaixa").innerText = "💾 Salvar Alterações";
+        document.getElementById("btnCancelarFaixa").style.display = "inline-block";
+        document.getElementById("boxFormFaixa").scrollIntoView({ behavior: "smooth" });
+    }
+
+    function cancelarEdicaoFaixa() {
+        document.getElementById("fEditId").value = "";
+        document.getElementById("fKm").value = "";
+        document.getElementById("fTaxa").value = "";
+        document.getElementById("tituloFormFaixa").innerText = "📍 Tabela de Taxa de Entrega por Quilometragem";
+        document.getElementById("btnSalvarFaixa").innerText = "💾 Salvar Faixa de KM";
+        document.getElementById("btnCancelarFaixa").style.display = "none";
+    }
+
+    async function salvarFaixa() {
+        const editId = document.getElementById("fEditId").value;
+        const ate_km = document.getElementById("fKm").value;
+        const taxa = document.getElementById("fTaxa").value;
+        if (!ate_km || !taxa) return alert("Preencha a quilometragem e o valor da taxa!");
+
+        const url = editId ? `/api/admin/faixas/${editId}` : "/api/admin/faixas";
+        const method = editId ? "PUT" : "POST";
+        await fetch(url, {
+            method, headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ate_km, taxa })
+        });
+        cancelarEdicaoFaixa();
+        carregarGestao();
+        mostrarToast("✅ Faixa de KM salva com sucesso!");
+    }
+
+    async function delFaixa(id) {
+        if (confirm("Excluir esta faixa de KM?")) {
+            await fetch(`/api/admin/faixas/${id}`, { method: "DELETE" });
+            carregarGestao();
+            mostrarToast("Faixa removida.");
+        }
+    }
+
+    // --- PRODUTOS (CRIAR / EDITAR / FOTO) ---
+    function editarProduto(id) {
+        const p = PRODUTOS_CACHE.find(x => x.id === id);
+        if (!p) return;
+        document.getElementById("pEditId").value = p.id;
+        document.getElementById("pNome").value = p.nome;
+        document.getElementById("pCat").value = p.categoria;
+        document.getElementById("pDesc").value = p.descricao || "";
+        document.getElementById("pPreco").value = p.preco;
+        fotoBase64Atual = p.imagem || "";
+        if (fotoBase64Atual) {
+            document.getElementById("pFotoPreview").src = fotoBase64Atual;
+            document.getElementById("areaPreviewFoto").style.display = "flex";
+        } else {
+            removerFotoPreview();
+        }
+        document.getElementById("tituloFormProd").innerText = `✏️ Editando: ${p.nome}`;
+        document.getElementById("btnSalvarProd").innerText = "💾 Salvar Alterações";
+        document.getElementById("btnCancelarEdicao").style.display = "inline-block";
+        document.getElementById("boxFormProduto").scrollIntoView({ behavior: "smooth" });
+    }
+
+    function cancelarEdicaoProduto() {
+        document.getElementById("pEditId").value = "";
+        document.getElementById("pNome").value = "";
+        document.getElementById("pDesc").value = "";
+        document.getElementById("pPreco").value = "";
+        removerFotoPreview();
+        document.getElementById("tituloFormProd").innerText = "+ Novo Produto no Cardápio";
+        document.getElementById("btnSalvarProd").innerText = "💾 Salvar Produto";
+        document.getElementById("btnCancelarEdicao").style.display = "none";
+    }
+
+    async function salvarProduto() {
+        const editId = document.getElementById("pEditId").value;
+        const nome = document.getElementById("pNome").value.trim();
+        const preco = document.getElementById("pPreco").value;
+        if (!nome || !preco) return alert("Preencha nome e preço!");
+
+        const payload = {
+            nome, categoria: document.getElementById("pCat").value,
+            descricao: document.getElementById("pDesc").value.trim(),
+            preco, imagem: fotoBase64Atual
+        };
+
+        const url = editId ? `/api/admin/produtos/${editId}` : "/api/admin/produtos";
+        const method = editId ? "PUT" : "POST";
+        await fetch(url, {
+            method, headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        cancelarEdicaoProduto();
+        carregarGestao();
+        mostrarToast("✅ Produto salvo com sucesso!");
+    }
+
+    async function toggleProd(id) { await fetch(`/api/admin/produtos/${id}/toggle`, { method: "POST" }); carregarGestao(); }
+    async function delProd(id) { if (confirm("Excluir produto?")) { await fetch(`/api/admin/produtos/${id}`, { method: "DELETE" }); carregarGestao(); } }
+
+    carregarPedidos();
+    setInterval(carregarPedidos, 5000);
+</script>
+</body>
+</html>
