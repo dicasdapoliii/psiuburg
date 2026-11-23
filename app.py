@@ -49,6 +49,12 @@ ADICIONAIS_PADRAO = [
 # ==========================================
 # 2. MODELOS DO BANCO DE DADOS
 # ==========================================
+class Configuracao(db.Model):
+    __tablename__ = "configuracoes"
+    chave = db.Column(db.String(80), primary_key=True)
+    valor = db.Column(db.String(200), default="")
+
+
 class Produto(db.Model):
     __tablename__ = "produtos"
     id = db.Column(db.Integer, primary_key=True)
@@ -171,6 +177,23 @@ class Pedido(db.Model):
         }
 
 
+def get_loja_aberta():
+    cfg = Configuracao.query.get("loja_aberta")
+    if not cfg:
+        return True
+    return cfg.valor == "1"
+
+
+def set_loja_aberta(aberta):
+    cfg = Configuracao.query.get("loja_aberta")
+    val = "1" if aberta else "0"
+    if cfg:
+        cfg.valor = val
+    else:
+        db.session.add(Configuracao(chave="loja_aberta", valor=val))
+    db.session.commit()
+
+
 def limpar_numeros(valor):
     return "".join(c for c in str(valor or "") if c.isdigit())
 
@@ -189,7 +212,6 @@ def enviar_whatsapp_automatico(telefone, mensagem):
         num = "55" + num
 
     # No Brasil (DDD > 28, como 66 em MT), muitos WhatsApps usam JID sem o 9o digito
-    # Ex: 5566999087449 -> 556699087449
     if len(num) == 13 and num.startswith("55") and int(num[2:4]) > 28 and num[4] == "9":
         num_sem_9 = num[:4] + num[5:]
     else:
@@ -298,6 +320,9 @@ def init_db():
             except Exception:
                 db.session.rollback()
 
+        if not Configuracao.query.get("loja_aberta"):
+            db.session.add(Configuracao(chave="loja_aberta", valor="1"))
+
         if Produto.query.count() == 0:
             produtos_iniciais = [
                 Produto(nome="Psiu! Clássico", categoria="Burgers", descricao="Pão brioche, blend bovino 150g, queijo prato, alface, tomate e molho especial.", preco=24.90),
@@ -356,6 +381,7 @@ def api_dados():
     produtos = [p.to_dict() for p in Produto.query.filter_by(ativo=1).order_by(Produto.categoria, Produto.nome).all()]
     return jsonify({
         "loja": NOME_LOJA,
+        "loja_aberta": get_loja_aberta(),
         "whatsapp": WHATSAPP_LOJA,
         "chave_pix": CHAVE_PIX,
         "endereco_loja": ENDERECO_LOJA,
@@ -533,6 +559,9 @@ def adicionar_endereco_cliente():
 
 @app.route("/api/pedidos", methods=["POST"])
 def criar_pedido():
+    if not get_loja_aberta():
+        return jsonify({"sucesso": False, "erro": "A PSIU! BURG está fechada para pedidos no momento."}), 400
+
     dados = request.json or {}
     agora_dt = datetime.now(FUSO_HORARIO)
     agora_str = agora_dt.strftime("%d/%m/%Y %H:%M")
@@ -577,8 +606,17 @@ def consultar_pedido(pedido_id):
 
 
 # ==========================================
-# 5. API DO PAINEL DA COZINHA + ENTREGADORES + FLUXO DE CAIXA
+# 5. API DO PAINEL DA COZINHA + LOJA ABERTA/FECHADA + ENTREGADORES
 # ==========================================
+@app.route("/api/admin/loja-status", methods=["GET", "POST"])
+def status_loja_admin():
+    if request.method == "POST":
+        aberta = bool((request.json or {}).get("aberta", True))
+        set_loja_aberta(aberta)
+        return jsonify({"sucesso": True, "loja_aberta": aberta})
+    return jsonify({"loja_aberta": get_loja_aberta()})
+
+
 @app.route("/api/admin/pedidos")
 def listar_pedidos_admin():
     pedidos = Pedido.query.order_by(Pedido.id.desc()).limit(60).all()
