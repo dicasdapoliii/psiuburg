@@ -209,7 +209,6 @@ def set_config(chave, valor):
 
 
 def get_loja_aberta():
-    # Por padrao, a loja nasce FECHADA ("0") ate clicar em Iniciar Expediente
     return get_config("loja_aberta", "0") == "1"
 
 
@@ -633,7 +632,7 @@ def consultar_pedido(pedido_id):
 
 
 # ==========================================
-# 5. API DO PAINEL (LOGIN, SENHA, EXPEDIENTE, ZERAR PEDIDOS)
+# 5. API DO PAINEL (LOGIN, SENHA, EXPEDIENTE, BALANÇO POR PERÍODO)
 # ==========================================
 @app.route("/api/admin/login", methods=["POST"])
 def login_admin():
@@ -660,7 +659,6 @@ def alterar_senha_admin():
 def limpar_todos_pedidos():
     Pedido.query.delete()
     db.session.commit()
-    # Reinicia a numeracao dos pedidos para comecar do #1 novamente
     try:
         db.session.execute(db.text("ALTER SEQUENCE pedidos_id_seq RESTART WITH 1"))
         db.session.commit()
@@ -797,33 +795,71 @@ def atualizar_pagamento(pedido_id):
 @app.route("/api/admin/financeiro")
 def relatorio_financeiro():
     mes_atual = datetime.now(FUSO_HORARIO).strftime("%Y-%m")
-    mes = request.args.get("mes", mes_atual)
-    pedidos = Pedido.query.filter_by(mes_ano=mes).order_by(Pedido.id.desc()).all()
-    expedientes = Expediente.query.filter_by(mes_ano=mes).order_by(Expediente.id.desc()).all()
+    mes_unico = request.args.get("mes")
+    mes_inicio = request.args.get("mes_inicio") or mes_unico or mes_atual
+    mes_fim = request.args.get("mes_fim") or mes_unico or mes_inicio
+
+    if mes_inicio > mes_fim:
+        mes_inicio, mes_fim = mes_fim, mes_inicio
+
+    pedidos = (
+        Pedido.query
+        .filter(Pedido.mes_ano >= mes_inicio, Pedido.mes_ano <= mes_fim)
+        .order_by(Pedido.id.desc())
+        .all()
+    )
+    expedientes = (
+        Expediente.query
+        .filter(Expediente.mes_ano >= mes_inicio, Expediente.mes_ano <= mes_fim)
+        .order_by(Expediente.id.desc())
+        .all()
+    )
 
     total_pago = qtd_pago = total_nao_pago = qtd_nao_pago = total_cancelado = qtd_cancelado = 0
     por_forma = {}
+    por_mes = {}
 
     for p in pedidos:
+        if p.mes_ano not in por_mes:
+            por_mes[p.mes_ano] = {
+                "mes": p.mes_ano, "pago": 0.0, "qtd_pago": 0,
+                "nao_pago": 0.0, "cancelado": 0.0, "qtd_cancelado": 0, "minutos": 0
+            }
         if p.status == "Cancelado":
             total_cancelado += p.total
             qtd_cancelado += 1
+            por_mes[p.mes_ano]["cancelado"] += p.total
+            por_mes[p.mes_ano]["qtd_cancelado"] += 1
         elif p.status_pagamento == "Pago":
             total_pago += p.total
             qtd_pago += 1
             por_forma[p.forma_pagamento] = por_forma.get(p.forma_pagamento, 0.0) + p.total
+            por_mes[p.mes_ano]["pago"] += p.total
+            por_mes[p.mes_ano]["qtd_pago"] += 1
         else:
             total_nao_pago += p.total
             qtd_nao_pago += 1
+            por_mes[p.mes_ano]["nao_pago"] += p.total
+
+    for e in expedientes:
+        if e.mes_ano not in por_mes:
+            por_mes[e.mes_ano] = {
+                "mes": e.mes_ano, "pago": 0.0, "qtd_pago": 0,
+                "nao_pago": 0.0, "cancelado": 0.0, "qtd_cancelado": 0, "minutos": 0
+            }
+        por_mes[e.mes_ano]["minutos"] += (e.duracao_minutos or 0)
 
     total_minutos_abertos = sum((e.duracao_minutos or 0) for e in expedientes)
+    resumo_mensal = [por_mes[k] for k in sorted(por_mes.keys())]
 
     return jsonify({
-        "mes": mes, "total_pedidos": len(pedidos),
+        "mes_inicio": mes_inicio, "mes_fim": mes_fim,
+        "total_pedidos": len(pedidos),
         "total_pago": total_pago, "qtd_pago": qtd_pago,
         "total_nao_pago": total_nao_pago, "qtd_nao_pago": qtd_nao_pago,
         "total_cancelado": total_cancelado, "qtd_cancelado": qtd_cancelado,
         "por_forma_pagamento": por_forma,
+        "resumo_mensal": resumo_mensal,
         "total_minutos_abertos": total_minutos_abertos,
         "expedientes": [e.to_dict() for e in expedientes],
         "pedidos": [p.to_dict() for p in pedidos]
