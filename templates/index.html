@@ -80,12 +80,14 @@
             align-items: center; font-weight: 800; cursor: pointer; box-shadow: 0 8px 25px rgba(255, 193, 7, 0.35); z-index: 20;
         }
 
+        /* Rodape com botao do administrador no canto esquerdo */
         footer {
-            text-align: center; padding: 28px 16px 20px; color: #666; font-size: 12px;
+            display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+            padding: 22px 18px; color: #666; font-size: 12px;
             border-top: 1px solid #1f1f1f; margin-top: 30px;
         }
         .link-admin {
-            display: inline-block; margin-top: 8px; color: #888; text-decoration: none;
+            display: inline-block; color: #888; text-decoration: none;
             border: 1px solid #2c2c2c; padding: 6px 14px; border-radius: 20px; font-size: 12px;
         }
         .link-admin:hover { color: var(--amarelo); border-color: var(--amarelo); }
@@ -167,7 +169,7 @@
 <header>
     <img src="/logo" alt="{{ nome_loja }}" class="logo-destaque">
     <div class="topo-acoes">
-        <div class="status-pill" id="statusLojaPill">● Aberto para pedidos</div>
+        <div class="status-pill" id="statusLojaPill">● Carregando...</div>
         <button class="btn-conta" id="btnMinhaConta" onclick="abrirModalConta()">👤 Faça login para efetuar seu pedido</button>
         <a href="https://www.instagram.com/psiuburg?knvt=aWxnNmx1b3F1MWV3" target="_blank" class="btn-insta">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -191,8 +193,8 @@
 <div class="container" id="listaProdutos">Carregando cardápio...</div>
 
 <footer>
-    <div>© {{ nome_loja }} — Rondonópolis, MT</div>
     <a href="/painel" class="link-admin">🔐 Área do Administrador</a>
+    <div>© {{ nome_loja }} — Rondonópolis, MT</div>
 </footer>
 
 <div class="barra-carrinho" id="barraCarrinho" onclick="abrirCheckout()">
@@ -444,7 +446,7 @@
 </div>
 
 <script>
-    let DADOS = { produtos: [], adicionais: [], chave_pix: "", whatsapp: "", loja_aberta: true };
+    let DADOS = { produtos: [], adicionais: [], chave_pix: "", whatsapp: "", loja_aberta: false };
     let categoriaAtual = "Todos";
     let carrinho = [];
     let produtoSelecionado = null;
