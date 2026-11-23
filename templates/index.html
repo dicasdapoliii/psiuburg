@@ -30,12 +30,12 @@
         }
         .btn-conta {
             background: #1f1f1f; color: var(--amarelo); border: 1px solid var(--amarelo);
-            padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer;
+            padding: 6px 15px; border-radius: 20px; font-size: 13px; font-weight: bold; cursor: pointer;
         }
         .btn-insta {
             display: inline-flex; align-items: center; gap: 6px;
             background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
-            color: #fff; text-decoration: none; padding: 6px 14px; border-radius: 20px;
+            color: #fff; text-decoration: none; padding: 5px 14px; border-radius: 20px;
             font-size: 13px; font-weight: bold; border: none; cursor: pointer;
         }
 
@@ -57,7 +57,7 @@
         }
         .prod-card:hover { border-color: var(--amarelo); }
         .prod-thumb {
-            width: 82px; height: 82px; object-fit: cover; border-radius: 10px;
+            width: 82px; height: 82px; border-radius: 10px; object-fit: cover;
             flex-shrink: 0; border: 1px solid #333; background: #111;
         }
         .prod-info { flex: 1; }
@@ -66,7 +66,7 @@
         .prod-preco { color: var(--amarelo); font-weight: 800; font-size: 16px; }
         .btn-add-mini {
             background: var(--amarelo); color: #000; border: none; border-radius: 8px;
-            padding: 8px 14px; font-weight: bold; cursor: pointer; flex-shrink: 0;
+            padding: 8px 14px; font-weight: bold; cursor: pointer; white-space: nowrap;
         }
 
         .barra-carrinho {
@@ -201,13 +201,13 @@
 <div class="modal-bg" id="modalConta">
     <div class="modal-box">
         <div class="modal-header">
-            <h2 id="tituloModalConta" style="color: var(--amarelo);">👤 Faça login para pedir</h2>
+            <h2 id="tituloModalConta" style="color: var(--amarelo);">👤 Fazer Login</h2>
             <button class="btn-fechar" onclick="fecharModal('modalConta')">✕</button>
         </div>
 
         <div id="telaLogin">
             <p style="font-size:13px; color:var(--cinza); margin-bottom:12px;">
-                Faça login com seu CPF e senha para efetuar seu pedido e escolher o endereço de entrega.
+                Faça login com seu CPF e senha para efetuar seu pedido e escolher seu endereço de entrega.
             </p>
             <label>Seu CPF:</label>
             <input id="loginCpf" placeholder="000.000.000-00" maxlength="14" oninput="mascaraCPF(this)">
@@ -315,7 +315,7 @@
             <h2 id="mpNome" style="color: var(--amarelo);"></h2>
             <button class="btn-fechar" onclick="fecharModal('modalProduto')">✕</button>
         </div>
-        <img id="mpImg" src="" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; margin-bottom:12px; display:none;">
+        <img id="mpFoto" src="" alt="" style="width:100%; max-height:200px; object-fit:cover; border-radius:12px; margin-bottom:12px; display:none;">
         <p id="mpDesc" style="color: var(--cinza); font-size: 14px; margin-bottom: 12px;"></p>
 
         <div id="areaAdicionaisProduto">
@@ -570,7 +570,7 @@
             document.getElementById(id).style.display = "none";
         });
         const mapa = {
-            login: ["telaLogin", "👤 Faça login para pedir"],
+            login: ["telaLogin", "👤 Fazer Login"],
             cadastro: ["telaCadastro", "📝 Criar Cadastro"],
             enderecos: ["telaEnderecos", "📍 Onde vamos entregar?"],
             novoEndereco: ["telaNovoEndereco", "➕ Novo Endereço"],
@@ -796,7 +796,7 @@
         const lista = categoriaAtual === "Todos" ? DADOS.produtos : DADOS.produtos.filter(p => p.categoria === categoriaAtual);
         document.getElementById("listaProdutos").innerHTML = lista.map(p => `
             <div class="prod-card" onclick="abrirProduto(${p.id})">
-                ${p.imagem_url ? `<img src="${p.imagem_url}" alt="${p.nome}" class="prod-thumb">` : ''}
+                ${p.imagem ? `<img src="${p.imagem}" alt="${p.nome}" class="prod-thumb">` : ''}
                 <div class="prod-info">
                     <h3>${p.nome}</h3>
                     <p>${p.descricao || ""}</p>
@@ -815,9 +815,9 @@
         document.getElementById("mpObs").value = "";
         document.getElementById("mpQtd").innerText = "1";
 
-        const imgEl = document.getElementById("mpImg");
-        if (produtoSelecionado.imagem_url) {
-            imgEl.src = produtoSelecionado.imagem_url;
+        const imgEl = document.getElementById("mpFoto");
+        if (produtoSelecionado.imagem) {
+            imgEl.src = produtoSelecionado.imagem;
             imgEl.style.display = "block";
         } else {
             imgEl.style.display = "none";
