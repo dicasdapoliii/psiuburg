@@ -45,16 +45,24 @@
         .btn-cinza { background: #333; color: #fff; }
         .btn-vermelho { background: var(--vermelho); color: #fff; }
 
+        .opcoes-barra { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
         .chk-whats-bar {
             background: #14281b; border: 1px solid #28a745; padding: 8px 14px;
-            border-radius: 10px; margin-bottom: 16px; display: inline-flex; align-items: center; gap: 8px; font-size: 13px;
+            border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer;
+        }
+        .chk-auto-bar {
+            background: #2b2208; border: 1px solid var(--amarelo); padding: 8px 14px;
+            border-radius: 10px; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; color: #ffe082;
         }
 
         .abas { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
         .aba-btn { background: #262626; color: #ccc; padding: 10px 18px; border-radius: 8px; }
         .aba-btn.ativa { background: var(--amarelo); color: #000; }
 
-        .grid-pedidos { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+        /* Lista vertical unica: um pedido embaixo do outro (novos no topo) */
+        .grid-pedidos {
+            display: flex; flex-direction: column; gap: 14px; max-width: 780px;
+        }
         .card-pedido {
             background: var(--card); border: 1px solid #333; border-radius: 12px; padding: 14px;
             border-left: 5px solid var(--amarelo);
@@ -118,16 +126,24 @@
 <div class="topo">
     <h1>🍔 Painel da Cozinha — {{ nome_loja }}</h1>
     <div class="botoes-topo">
+        <button id="btnStatusLoja" class="btn-verde" onclick="alternarStatusLoja()">🟢 Loja Aberta</button>
         <button id="btnSom" class="btn-vermelho" onclick="ativarSom()">🔇 Ativar Alerta Sonoro</button>
         <button class="btn-cinza" onclick="carregarPedidos()">🔄 Atualizar</button>
         <a href="/" target="_blank"><button class="btn-amarelo">📱 Ver Cardápio</button></a>
     </div>
 </div>
 
-<label class="chk-whats-bar">
-    <input type="checkbox" id="chkAutoWhats" style="width:auto;">
-    <span>💬 Abrir janela do WhatsApp Web manualmente (desmarque para usar o envio automático do Green-API)</span>
-</label>
+<div class="opcoes-barra">
+    <label class="chk-auto-bar">
+        <input type="checkbox" id="chkAceiteAuto" onchange="salvarPrefAceiteAuto()" style="width:auto;">
+        <span>⚡ <strong>Aceite e Impressão Automáticos</strong> (desmarcado = Aceite Manual)</span>
+    </label>
+
+    <label class="chk-whats-bar">
+        <input type="checkbox" id="chkAutoWhats" style="width:auto;">
+        <span>💬 Abrir WhatsApp Web manualmente (deixe desmarcado para usar o Green-API)</span>
+    </label>
+</div>
 
 <div class="abas">
     <button class="aba-btn ativa" id="tabPedidosBtn" onclick="trocarAba('pedidos')">📋 Pedidos ao Vivo</button>
@@ -186,7 +202,6 @@
 
 <!-- ABA 3: CARDAPIO, TAXAS E ENTREGADORES -->
 <div id="abaGestao" style="display:none;">
-    <!-- ENTREGADORES -->
     <div class="painel-form" id="boxFormEntregador">
         <h3 style="color:var(--amarelo); margin-bottom:6px;" id="tituloFormEnt">🛵 Cadastro de Entregadores (Motoboys)</h3>
         <p style="font-size:13px; color:#aaa; margin-bottom:10px;">
@@ -202,7 +217,6 @@
         <div id="listaAdminEntregadores" style="margin-top:12px;"></div>
     </div>
 
-    <!-- TAXAS POR KM -->
     <div class="painel-form" id="boxFormFaixa">
         <h3 style="color:var(--amarelo); margin-bottom:6px;" id="tituloFormFaixa">📍 Tabela de Taxa de Entrega por Quilometragem</h3>
         <input type="hidden" id="fEditId" value="">
@@ -215,7 +229,6 @@
         <div id="listaAdminFaixas" style="margin-top:12px;"></div>
     </div>
 
-    <!-- CRIAR / EDITAR PRODUTO COM FOTO -->
     <div class="painel-form" id="boxFormProduto">
         <h3 style="color:var(--amarelo); margin-bottom:10px;" id="tituloFormProd">+ Novo Produto no Cardápio</h3>
         <input type="hidden" id="pEditId" value="">
@@ -263,6 +276,17 @@
         }
     }
 
+    const chkAceiteAuto = document.getElementById("chkAceiteAuto");
+    chkAceiteAuto.checked = localStorage.getItem("psiuburg_aceite_auto") === "1";
+
+    function salvarPrefAceiteAuto() {
+        localStorage.setItem("psiuburg_aceite_auto", chkAceiteAuto.checked ? "1" : "0");
+        mostrarToast(chkAceiteAuto.checked
+            ? "⚡ Modo Automático ativado! Novos pedidos serão aceitos e impressos sozinhos."
+            : "🖐️ Modo Manual ativado! Você aceita e imprime cada pedido quando quiser.");
+    }
+
+    let lojaAbertaAtual = true;
     let somAtivo = false;
     let ultimoIdVisto = 0;
     let primeiraCarga = true;
@@ -276,6 +300,35 @@
     const fmt = v => "R$ " + Number(v).toFixed(2).replace(".", ",");
     const hoje = new Date();
     document.getElementById("filtroMes").value = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
+
+    async function carregarStatusLoja() {
+        const r = await fetch("/api/admin/loja-status");
+        const d = await r.json();
+        lojaAbertaAtual = d.loja_aberta;
+        atualizarBotaoLoja();
+    }
+
+    function atualizarBotaoLoja() {
+        const btn = document.getElementById("btnStatusLoja");
+        if (lojaAbertaAtual) {
+            btn.className = "btn-verde";
+            btn.innerText = "🟢 Loja Aberta (Fechar)";
+        } else {
+            btn.className = "btn-vermelho";
+            btn.innerText = "🔴 Loja Fechada (Abrir)";
+        }
+    }
+
+    async function alternarStatusLoja() {
+        const novo = !lojaAbertaAtual;
+        await fetch("/api/admin/loja-status", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ aberta: novo })
+        });
+        lojaAbertaAtual = novo;
+        atualizarBotaoLoja();
+        mostrarToast(novo ? "🟢 Loja ABERTA para pedidos!" : "🔴 Loja FECHADA para pedidos!", !novo);
+    }
 
     function mostrarToast(msg, erro = false) {
         const el = document.getElementById("toastAviso");
@@ -294,7 +347,6 @@
         reader.onload = e => {
             const img = new Image();
             img.onload = () => {
-                // Redimensiona para miniatura leve (max 320px) para salvar rapido no Neon
                 const canvas = document.createElement("canvas");
                 const max = 320;
                 let w = img.width, h = img.height;
@@ -375,9 +427,13 @@
         const r = await fetch("/api/admin/pedidos");
         const pedidos = await r.json();
 
+        let novosRecebidos = [];
         if (pedidos.length > 0) {
             const maiorId = pedidos[0].id;
-            if (!primeiraCarga && maiorId > ultimoIdVisto) tocarCampainha();
+            if (!primeiraCarga && maiorId > ultimoIdVisto) {
+                tocarCampainha();
+                novosRecebidos = pedidos.filter(p => p.id > ultimoIdVisto && p.status === "Recebido");
+            }
             ultimoIdVisto = maiorId;
         }
         primeiraCarga = false;
@@ -434,7 +490,7 @@
                 </div>` : ''}
 
                 <div class="acoes">
-                    <button class="btn-amarelo" onclick="imprimir80mm(${p.id})">🖨️ 80mm</button>
+                    <button class="btn-amarelo" onclick="imprimir80mm(${p.id})">🖨️ Imprimir</button>
 
                     ${p.status !== 'Cancelado' && p.status_pagamento !== 'Pago' ? `
                         ${p.forma_pagamento.includes('Link') ? `<button class="btn-ton" onclick="enviarLinkTon(${p.id}, '${p.cliente_whatsapp}', ${p.total})">🔗 Link Ton</button>` : ''}
@@ -445,10 +501,17 @@
                     ${p.status === 'Aceito' ? `<button class="btn-laranja" onclick="mudarStatus(${p.id}, 'Em Preparo')">🔥 Preparar</button>` : ''}
                     ${p.status === 'Em Preparo' ? `<button class="btn-verde" onclick="mudarStatus(${p.id}, 'Saiu para Entrega')">🛵 Saiu p/ Entrega</button>` : ''}
                     ${p.status !== 'Concluído' && p.status !== 'Cancelado' ? `<button class="btn-cinza" onclick="mudarStatus(${p.id}, 'Concluído')">✔ Concluir</button>` : ''}
-                    ${p.status !== 'Cancelado' ? `<button class="btn-vermelho" onclick="cancelarPedido(${p.id})">❌</button>` : ''}
+                    ${p.status !== 'Cancelado' ? `<button class="btn-vermelho" onclick="cancelarPedido(${p.id})">❌ Cancelar Pedido</button>` : ''}
                 </div>
             </div>`;
         }).join("");
+
+        if (chkAceiteAuto.checked && novosRecebidos.length > 0) {
+            for (const pNovo of novosRecebidos) {
+                mudarStatus(pNovo.id, "Aceito");
+                imprimir80mm(pNovo.id);
+            }
+        }
     }
 
     async function enviarEntregador(id) {
@@ -608,7 +671,6 @@
         `).join("");
     }
 
-    // --- ENTREGADORES (CRIAR / EDITAR) ---
     function editarEntregador(id) {
         const e = ENTREGADORES_CACHE.find(x => x.id === id);
         if (!e) return;
@@ -661,7 +723,6 @@
         }
     }
 
-    // --- FAIXAS DE KM (CRIAR / EDITAR) ---
     function editarFaixa(id) {
         const f = FAIXAS_CACHE.find(x => x.id === id);
         if (!f) return;
@@ -708,7 +769,6 @@
         }
     }
 
-    // --- PRODUTOS (CRIAR / EDITAR / FOTO) ---
     function editarProduto(id) {
         const p = PRODUTOS_CACHE.find(x => x.id === id);
         if (!p) return;
@@ -767,6 +827,7 @@
     async function toggleProd(id) { await fetch(`/api/admin/produtos/${id}/toggle`, { method: "POST" }); carregarGestao(); }
     async function delProd(id) { if (confirm("Excluir produto?")) { await fetch(`/api/admin/produtos/${id}`, { method: "DELETE" }); carregarGestao(); } }
 
+    carregarStatusLoja();
     carregarPedidos();
     setInterval(carregarPedidos, 5000);
 </script>
