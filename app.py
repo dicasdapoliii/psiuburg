@@ -55,6 +55,25 @@ class Configuracao(db.Model):
     valor = db.Column(db.String(200), default="")
 
 
+class Expediente(db.Model):
+    __tablename__ = "expedientes"
+    id = db.Column(db.Integer, primary_key=True)
+    mes_ano = db.Column(db.String(10), nullable=False)
+    data = db.Column(db.String(20), nullable=False)
+    inicio_hora = db.Column(db.String(10), nullable=False)
+    fim_hora = db.Column(db.String(10), default="")
+    inicio_ts = db.Column(db.Float, nullable=False)
+    fim_ts = db.Column(db.Float, nullable=True)
+    duracao_minutos = db.Column(db.Integer, default=0)
+
+    def to_dict(self):
+        return {
+            "id": self.id, "mes_ano": self.mes_ano, "data": self.data,
+            "inicio_hora": self.inicio_hora, "fim_hora": self.fim_hora or "",
+            "duracao_minutos": self.duracao_minutos or 0
+        }
+
+
 class Produto(db.Model):
     __tablename__ = "produtos"
     id = db.Column(db.Integer, primary_key=True)
@@ -606,15 +625,50 @@ def consultar_pedido(pedido_id):
 
 
 # ==========================================
-# 5. API DO PAINEL DA COZINHA + LOJA ABERTA/FECHADA + ENTREGADORES
+# 5. API DO PAINEL DA COZINHA + EXPEDIENTE + ENTREGADORES
 # ==========================================
 @app.route("/api/admin/loja-status", methods=["GET", "POST"])
 def status_loja_admin():
     if request.method == "POST":
         aberta = bool((request.json or {}).get("aberta", True))
         set_loja_aberta(aberta)
-        return jsonify({"sucesso": True, "loja_aberta": aberta})
-    return jsonify({"loja_aberta": get_loja_aberta()})
+        agora_dt = datetime.now(FUSO_HORARIO)
+        agora_ts = agora_dt.timestamp()
+
+        if aberta:
+            # Inicia um novo expediente se nao houver um em aberto
+            exp_aberto = Expediente.query.filter_by(fim_hora="").order_by(Expediente.id.desc()).first()
+            if not exp_aberto:
+                exp_aberto = Expediente(
+                    mes_ano=agora_dt.strftime("%Y-%m"),
+                    data=agora_dt.strftime("%d/%m/%Y"),
+                    inicio_hora=agora_dt.strftime("%H:%M"),
+                    fim_hora="",
+                    inicio_ts=agora_ts,
+                    duracao_minutos=0
+                )
+                db.session.add(exp_aberto)
+                db.session.commit()
+            return jsonify({"sucesso": True, "loja_aberta": True, "expediente": exp_aberto.to_dict()})
+        else:
+            # Encerra o expediente em aberto e calcula a duracao
+            exp_aberto = Expediente.query.filter_by(fim_hora="").order_by(Expediente.id.desc()).first()
+            if exp_aberto:
+                exp_aberto.fim_hora = agora_dt.strftime("%H:%M")
+                exp_aberto.fim_ts = agora_ts
+                exp_aberto.duracao_minutos = max(1, int((agora_ts - exp_aberto.inicio_ts) // 60))
+                db.session.commit()
+            return jsonify({
+                "sucesso": True,
+                "loja_aberta": False,
+                "expediente": exp_aberto.to_dict() if exp_aberto else None
+            })
+
+    ultimo_exp = Expediente.query.order_by(Expediente.id.desc()).first()
+    return jsonify({
+        "loja_aberta": get_loja_aberta(),
+        "expediente": ultimo_exp.to_dict() if ultimo_exp else None
+    })
 
 
 @app.route("/api/admin/pedidos")
@@ -705,6 +759,7 @@ def relatorio_financeiro():
     mes_atual = datetime.now(FUSO_HORARIO).strftime("%Y-%m")
     mes = request.args.get("mes", mes_atual)
     pedidos = Pedido.query.filter_by(mes_ano=mes).order_by(Pedido.id.desc()).all()
+    expedientes = Expediente.query.filter_by(mes_ano=mes).order_by(Expediente.id.desc()).all()
 
     total_pago = qtd_pago = total_nao_pago = qtd_nao_pago = total_cancelado = qtd_cancelado = 0
     por_forma = {}
@@ -721,12 +776,16 @@ def relatorio_financeiro():
             total_nao_pago += p.total
             qtd_nao_pago += 1
 
+    total_minutos_abertos = sum((e.duracao_minutos or 0) for e in expedientes)
+
     return jsonify({
         "mes": mes, "total_pedidos": len(pedidos),
         "total_pago": total_pago, "qtd_pago": qtd_pago,
         "total_nao_pago": total_nao_pago, "qtd_nao_pago": qtd_nao_pago,
         "total_cancelado": total_cancelado, "qtd_cancelado": qtd_cancelado,
         "por_forma_pagamento": por_forma,
+        "total_minutos_abertos": total_minutos_abertos,
+        "expedientes": [e.to_dict() for e in expedientes],
         "pedidos": [p.to_dict() for p in pedidos]
     })
 
