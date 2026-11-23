@@ -44,13 +44,22 @@ ADICIONAIS_PADRAO = [
     {"nome": "Molho Psiu Especial", "preco": 2.00},
 ]
 
+CATEGORIAS_CUSTO_PADRAO = [
+    "Ingredientes",
+    "Bebidas (Estoque)",
+    "Embalagens",
+    "Gás / Energia / Água",
+    "Entregador / Frete",
+    "Outros"
+]
+
 # ==========================================
 # 2. MODELOS DO BANCO DE DADOS
 # ==========================================
 class Configuracao(db.Model):
     __tablename__ = "configuracoes"
     chave = db.Column(db.String(80), primary_key=True)
-    valor = db.Column(db.String(200), default="")
+    valor = db.Column(db.Text, default="")
 
 
 class Expediente(db.Model):
@@ -75,8 +84,8 @@ class Expediente(db.Model):
 class Custo(db.Model):
     __tablename__ = "custos"
     id = db.Column(db.Integer, primary_key=True)
-    data = db.Column(db.String(20), nullable=False)      # Formato YYYY-MM-DD
-    mes_ano = db.Column(db.String(10), nullable=False)   # Formato YYYY-MM
+    data = db.Column(db.String(20), nullable=False)
+    mes_ano = db.Column(db.String(10), nullable=False)
     descricao = db.Column(db.String(200), nullable=False)
     categoria = db.Column(db.String(80), default="Ingredientes")
     valor = db.Column(db.Float, nullable=False)
@@ -223,6 +232,18 @@ def set_config(chave, valor):
     else:
         db.session.add(Configuracao(chave=chave, valor=str(valor)))
     db.session.commit()
+
+
+def get_categorias_custo():
+    raw = get_config("categorias_custo", "")
+    if raw:
+        try:
+            lista = json.loads(raw)
+            if isinstance(lista, list) and lista:
+                return lista
+        except Exception:
+            pass
+    return list(CATEGORIAS_CUSTO_PADRAO)
 
 
 def get_loja_aberta():
@@ -649,7 +670,7 @@ def consultar_pedido(pedido_id):
 
 
 # ==========================================
-# 5. API DO PAINEL (LOGIN, CUSTOS, EXPEDIENTE, BALANÇO)
+# 5. API DO PAINEL (LOGIN, CUSTOS, CATEGORIAS, EXPEDIENTE, BALANÇO)
 # ==========================================
 @app.route("/api/admin/login", methods=["POST"])
 def login_admin():
@@ -684,6 +705,20 @@ def limpar_todos_pedidos():
     return jsonify({"sucesso": True})
 
 
+@app.route("/api/admin/categorias-custo", methods=["GET", "POST"])
+def gerenciar_categorias_custo():
+    lista = get_categorias_custo()
+    if request.method == "POST":
+        nova = (request.json or {}).get("nome", "").strip()
+        if not nova:
+            return jsonify({"sucesso": False, "erro": "Informe o nome da categoria."}), 400
+        if nova not in lista:
+            lista.append(nova)
+            set_config("categorias_custo", json.dumps(lista, ensure_ascii=False))
+        return jsonify({"sucesso": True, "categorias": lista})
+    return jsonify({"categorias": lista})
+
+
 @app.route("/api/admin/custos", methods=["GET", "POST"])
 def gerenciar_custos():
     if request.method == "POST":
@@ -704,9 +739,16 @@ def gerenciar_custos():
     mes = request.args.get("mes") or datetime.now(FUSO_HORARIO).strftime("%Y-%m")
     lista = Custo.query.filter_by(mes_ano=mes).order_by(Custo.data.desc(), Custo.id.desc()).all()
     total_mes = sum(c.valor for c in lista)
+    por_categoria = {}
+    for c in lista:
+        cat = c.categoria or "Outros"
+        por_categoria[cat] = por_categoria.get(cat, 0.0) + c.valor
+
     return jsonify({
         "mes": mes,
         "total_mes": total_mes,
+        "por_categoria": por_categoria,
+        "categorias": get_categorias_custo(),
         "custos": [c.to_dict() for c in lista]
     })
 
