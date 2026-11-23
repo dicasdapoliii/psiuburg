@@ -4,6 +4,7 @@ import json
 import math
 import urllib.request
 import urllib.parse
+import urllib.error
 from datetime import datetime, timedelta, timezone
 from flask import Flask, render_template, render_template_string, request, jsonify, send_from_directory
 from flask_sqlalchemy import SQLAlchemy
@@ -20,6 +21,7 @@ ENDERECO_LOJA = "Avenida Guarapuava, 1735 - Jardim Rondônia, Rondonópolis - MT
 INSTAGRAM_LOJA = "https://www.instagram.com/psiuburg?knvt=aWxnNmx1b3F1MWV3"
 FUSO_HORARIO = timezone(timedelta(hours=-4))  # Horario de MT (UTC-4)
 
+# Coordenadas aproximadas da Av. Guarapuava, 1735 - Jardim Rondonia, Rondonopolis - MT
 LAT_LOJA = -16.4708
 LNG_LOJA = -54.6356
 TAXA_PADRAO_SE_NAO_LOCALIZAR = 8.00
@@ -54,14 +56,14 @@ class Produto(db.Model):
     categoria = db.Column(db.String(80), nullable=False)
     descricao = db.Column(db.Text, default="")
     preco = db.Column(db.Float, nullable=False)
-    imagem_url = db.Column(db.Text, default="")
+    imagem = db.Column(db.Text, default="")
     ativo = db.Column(db.Integer, default=1)
 
     def to_dict(self):
         return {
             "id": self.id, "nome": self.nome, "categoria": self.categoria,
             "descricao": self.descricao, "preco": self.preco,
-            "imagem_url": self.imagem_url or "", "ativo": self.ativo
+            "imagem": self.imagem or "", "ativo": self.ativo
         }
 
 
@@ -80,7 +82,7 @@ class Entregador(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(120), nullable=False)
     whatsapp = db.Column(db.String(30), nullable=False)
-    padrao = db.Column(db.Integer, default=0)
+    padrao = db.Column(db.Integer, default=0)  # 1 = Fixo do dia
 
     def to_dict(self):
         return {
@@ -173,30 +175,28 @@ def limpar_numeros(valor):
     return "".join(c for c in str(valor or "") if c.isdigit())
 
 
-def formatar_chat_id_brasil(telefone):
-    """Formata o numero para o padrao do WhatsApp (remove o 9o digito em DDDs > 28 como MT)."""
+def enviar_whatsapp_automatico(telefone, mensagem):
+    """Envia mensagem via Green-API com log detalhado e tratamento de DDD brasileiro."""
+    if not WHATSAPP_API_URL:
+        return False, "WHATSAPP_API_URL não configurada no Render."
+    if not telefone:
+        return False, "Telefone do destinatário vazio."
+
     num = limpar_numeros(telefone)
     if len(num) < 10:
-        return None
+        return False, f"Telefone inválido (sem DDD): {num}"
     if not num.startswith("55"):
         num = "55" + num
-    # Para DDDs acima de 28 (ex: 66, 65), o WhatsApp costuma registrar sem o 9o digito
-    if len(num) == 13 and num.startswith("55"):
-        ddd = int(num[2:4])
-        if ddd > 28 and num[4] == "9":
-            num = num[:4] + num[5:]
-    return f"{num}@c.us"
 
+    # No Brasil (DDD > 28, como 66 em MT), muitos WhatsApps usam JID sem o 9o digito
+    # Ex: 5566999087449 -> 556699087449
+    if len(num) == 13 and num.startswith("55") and int(num[2:4]) > 28 and num[4] == "9":
+        num_sem_9 = num[:4] + num[5:]
+    else:
+        num_sem_9 = num
 
-def enviar_whatsapp_automatico(telefone, mensagem):
-    """Envia mensagem automaticamente via Green-API e retorna (sucesso, detalhe)."""
-    if not WHATSAPP_API_URL:
-        return False, "WHATSAPP_API_URL não configurada no Render"
-    chat_id = formatar_chat_id_brasil(telefone)
-    if not chat_id:
-        return False, "Número de telefone inválido (falta DDD)"
     try:
-        payload = json.dumps({"chatId": chat_id, "message": mensagem}).encode("utf-8")
+        payload = json.dumps({"chatId": f"{num_sem_9}@c.us", "message": mensagem}).encode("utf-8")
         req = urllib.request.Request(
             WHATSAPP_API_URL,
             data=payload,
@@ -204,15 +204,15 @@ def enviar_whatsapp_automatico(telefone, mensagem):
             method="POST"
         )
         with urllib.request.urlopen(req, timeout=8) as resp:
-            body = resp.read().decode("utf-8", errors="ignore")
-            print(f"[GREEN-API OK] {chat_id} -> {resp.status} {body}", flush=True)
-            return resp.status == 200, "Enviado"
+            corpo = resp.read().decode("utf-8", errors="ignore")
+            print(f"[GREEN-API OK] Para {num_sem_9}: {resp.status} - {corpo}", flush=True)
+            return True, "Enviado com sucesso"
     except urllib.error.HTTPError as e:
-        err_body = e.read().decode("utf-8", errors="ignore")
-        print(f"[GREEN-API ERRO HTTP] {chat_id} -> {e.code} {err_body}", flush=True)
-        return False, f"Erro Green-API ({e.code}): verifique limite do plano ou autorização"
+        corpo_erro = e.read().decode("utf-8", errors="ignore")
+        print(f"[GREEN-API ERRO HTTP {e.code}] Para {num_sem_9}: {corpo_erro}", flush=True)
+        return False, f"Green-API retornou erro {e.code}: {corpo_erro[:120]}"
     except Exception as e:
-        print(f"[GREEN-API ERRO] {chat_id} -> {e}", flush=True)
+        print(f"[GREEN-API EXCECAO] Para {num_sem_9}: {e}", flush=True)
         return False, str(e)
 
 
@@ -278,7 +278,7 @@ def init_db():
         db.create_all()
 
         colunas_novas = [
-            "ALTER TABLE produtos ADD COLUMN imagem_url TEXT DEFAULT ''",
+            "ALTER TABLE produtos ADD COLUMN imagem TEXT DEFAULT ''",
             "ALTER TABLE clientes ADD COLUMN cpf VARCHAR(20) DEFAULT ''",
             "ALTER TABLE clientes ADD COLUMN senha VARCHAR(100) DEFAULT ''",
             "ALTER TABLE clientes ADD COLUMN enderecos_json TEXT DEFAULT '[]'",
@@ -401,7 +401,6 @@ def login_cliente():
     d = request.json or {}
     cpf_dig = limpar_numeros(d.get("cpf", ""))
     senha = str(d.get("senha", "")).strip()
-
     if not cpf_dig:
         return jsonify({"sucesso": False, "erro": "Informe o CPF."})
 
@@ -421,11 +420,7 @@ def login_cliente():
         db.session.commit()
 
     pedidos = Pedido.query.filter_by(cliente_whatsapp=cli.whatsapp).order_by(Pedido.id.desc()).limit(10).all()
-    return jsonify({
-        "sucesso": True,
-        "cliente": cli.to_dict(),
-        "pedidos": [p.to_dict() for p in pedidos]
-    })
+    return jsonify({"sucesso": True, "cliente": cli.to_dict(), "pedidos": [p.to_dict() for p in pedidos]})
 
 
 @app.route("/api/clientes/buscar", methods=["POST"])
@@ -597,7 +592,7 @@ def atualizar_status(pedido_id):
     p.status = novo_status
     db.session.commit()
 
-    whats_ok, whats_msg = False, ""
+    whats_ok, whats_msg = True, ""
     msgs = {
         "Aceito": f"Olá {p.cliente_nome}! 👍 *Seu pedido #{p.id} foi aceito* na {NOME_LOJA}!",
         "Em Preparo": f"Olá {p.cliente_nome}! 🔥 *Seu pedido #{p.id} está sendo preparado* com todo capricho na chapa! 🍔",
@@ -606,17 +601,18 @@ def atualizar_status(pedido_id):
     if novo_status in msgs:
         whats_ok, whats_msg = enviar_whatsapp_automatico(p.cliente_whatsapp, msgs[novo_status])
 
-    ent_ok = False
+    ent_ok, ent_msg = False, ""
     if novo_status == "Aceito" and p.tipo_entrega == "Entrega":
         fixo = Entregador.query.filter_by(padrao=1).first()
         if fixo:
-            ent_ok, _ = enviar_whatsapp_automatico(fixo.whatsapp, montar_mensagem_entregador(p))
+            ent_ok, ent_msg = enviar_whatsapp_automatico(fixo.whatsapp, montar_mensagem_entregador(p))
 
     return jsonify({
         "sucesso": True,
         "whats_ok": whats_ok,
         "whats_msg": whats_msg,
-        "entregador_avisado_auto": ent_ok
+        "entregador_avisado_auto": ent_ok,
+        "ent_msg": ent_msg
     })
 
 
@@ -652,7 +648,7 @@ def enviar_pedido_entregador(pedido_id):
 def atualizar_pagamento(pedido_id):
     p = Pedido.query.get_or_404(pedido_id)
     d = request.json or {}
-    whats_ok, whats_msg = False, ""
+    whats_ok, whats_msg = True, ""
     if "status_pagamento" in d:
         p.status_pagamento = d["status_pagamento"]
         if d["status_pagamento"] == "Pago":
@@ -716,11 +712,9 @@ def gerenciar_produtos():
     if request.method == "POST":
         d = request.json or {}
         db.session.add(Produto(
-            nome=d["nome"].strip(), categoria=d["categoria"],
-            descricao=d.get("descricao", "").strip(),
-            preco=float(d["preco"]),
-            imagem_url=d.get("imagem_url", ""),
-            ativo=1
+            nome=d["nome"], categoria=d["categoria"],
+            descricao=d.get("descricao", ""), preco=float(d["preco"]),
+            imagem=d.get("imagem", ""), ativo=1
         ))
         db.session.commit()
         return jsonify({"sucesso": True})
@@ -740,8 +734,8 @@ def editar_ou_excluir_produto(prod_id):
         p.categoria = d.get("categoria", p.categoria)
         p.descricao = d.get("descricao", p.descricao).strip()
         p.preco = float(d.get("preco", p.preco))
-        if "imagem_url" in d and d["imagem_url"] is not None:
-            p.imagem_url = d["imagem_url"]
+        if "imagem" in d:
+            p.imagem = d["imagem"]
         db.session.commit()
         return jsonify({"sucesso": True})
 
@@ -781,6 +775,7 @@ def editar_ou_excluir_entregador(ent_id):
         ent.whatsapp = limpar_numeros(d.get("whatsapp", ent.whatsapp))
         db.session.commit()
         return jsonify({"sucesso": True})
+
     db.session.delete(ent)
     db.session.commit()
     return jsonify({"sucesso": True})
@@ -813,6 +808,7 @@ def editar_ou_excluir_faixa(faixa_id):
         f.taxa = float(d.get("taxa", f.taxa))
         db.session.commit()
         return jsonify({"sucesso": True})
+
     db.session.delete(f)
     db.session.commit()
     return jsonify({"sucesso": True})
