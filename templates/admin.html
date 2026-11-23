@@ -102,6 +102,8 @@
         .painel-form input, .painel-form select {
             width: 100%; padding: 10px; margin: 6px 0 10px; background: #111; border: 1px solid #333; color: #fff; border-radius: 8px;
         }
+        .linha-cat-custo { display: flex; gap: 8px; align-items: center; margin: 6px 0 10px; }
+        .linha-cat-custo select { flex: 1; margin: 0; }
         .linha-item {
             display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;
             padding: 10px; background: #181818; border-radius: 8px; margin-bottom: 6px;
@@ -190,22 +192,18 @@
     <div class="painel-form" id="boxFormCusto">
         <h3 style="color:var(--amarelo); margin-bottom:6px;" id="tituloFormCusto">💸 Lançar Custo / Compra de Ingredientes</h3>
         <p style="font-size:13px; color:#aaa; margin-bottom:10px;">
-            Registre suas compras do dia (mussarela, presunto, pão, carne, embalagens, gás) para o sistema calcular seu <strong>Lucro Real</strong> no Fluxo de Caixa.
+            Registre suas compras do dia (mussarela, calabresa, pão, carne, embalagens, gás) para o sistema calcular seu <strong>Lucro Real</strong> no Fluxo de Caixa.
         </p>
         <input type="hidden" id="cEditId" value="">
         <label style="font-size:13px; color:#ccc;">Data da Compra:</label>
         <input id="cData" type="date">
         <label style="font-size:13px; color:#ccc;">O que foi comprado? (Descrição):</label>
-        <input id="cDesc" placeholder="Ex: 1 kg de mussarela, 50 pães brioche, 2 kg de bacon...">
+        <input id="cDesc" placeholder="Ex: 1 kg de mussarela, 2 kg de calabresa, 50 pães brioche...">
         <label style="font-size:13px; color:#ccc;">Categoria:</label>
-        <select id="cCat">
-            <option value="Ingredientes">🧀 Ingredientes</option>
-            <option value="Bebidas (Estoque)">🥤 Bebidas (Estoque)</option>
-            <option value="Embalagens">📦 Embalagens</option>
-            <option value="Gás / Energia / Água">🔥 Gás / Energia / Água</option>
-            <option value="Entregador / Frete">🛵 Entregador / Frete</option>
-            <option value="Outros">📌 Outros</option>
-        </select>
+        <div class="linha-cat-custo">
+            <select id="cCat"></select>
+            <button type="button" class="btn-azul" style="white-space:nowrap;" onclick="adicionarCategoriaCusto()">+ Nova Categoria</button>
+        </div>
         <label style="font-size:13px; color:#ccc;">Valor Gasto (R$):</label>
         <input id="cValor" type="number" step="0.01" placeholder="Ex: 48.50">
         <div style="display:flex; gap:8px;">
@@ -224,6 +222,8 @@
                 Total Gasto no Mês: <span id="totalCustosMes">R$ 0,00</span>
             </div>
         </div>
+
+        <div id="resumoCustosCat" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;"></div>
         <div id="listaCustosMes">Carregando custos...</div>
     </div>
 </div>
@@ -713,14 +713,45 @@
     }
 
     // ==========================================
-    // GESTÃO DE CUSTOS
+    // GESTÃO DE CUSTOS + CATEGORIAS PERSONALIZADAS
     // ==========================================
+    function preencherSelectCategoriasCusto(lista, selecionada = "") {
+        const sel = document.getElementById("cCat");
+        const atual = selecionada || sel.value;
+        sel.innerHTML = (lista || []).map(cat => `<option value="${cat}">${cat}</option>`).join("");
+        if (atual && lista.includes(atual)) sel.value = atual;
+    }
+
+    async function adicionarCategoriaCusto() {
+        const nome = prompt("Digite o nome da nova categoria (ex: Calabresa / Frios, Carnes, Limpeza, Aluguel):");
+        if (!nome || !nome.trim()) return;
+        const r = await fetch("/api/admin/categorias-custo", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nome: nome.trim() })
+        });
+        const d = await r.json();
+        if (d.sucesso) {
+            preencherSelectCategoriasCusto(d.categorias, nome.trim());
+            mostrarToast(`✅ Categoria "${nome.trim()}" adicionada!`);
+        }
+    }
+
     async function carregarCustos() {
         const mes = document.getElementById("filtroMesCustos").value || mesAtualStr;
         const r = await fetch(`/api/admin/custos?mes=${mes}`);
         const d = await r.json();
         CUSTOS_CACHE = d.custos || [];
+        preencherSelectCategoriasCusto(d.categorias || []);
         document.getElementById("totalCustosMes").innerText = fmt(d.total_mes || 0);
+
+        const porCat = Object.entries(d.por_categoria || {});
+        document.getElementById("resumoCustosCat").innerHTML = porCat.length
+            ? porCat.map(([cat, val]) => `
+                <div style="background:#141414; border:1px solid #333; padding:6px 12px; border-radius:8px; font-size:13px;">
+                    <strong>${cat}:</strong> <span style="color:#ff6b6b;">${fmt(val)}</span>
+                </div>
+            `).join("")
+            : "";
 
         document.getElementById("listaCustosMes").innerHTML = CUSTOS_CACHE.length
             ? CUSTOS_CACHE.map(c => `
