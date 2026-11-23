@@ -43,6 +43,36 @@
             font-size: 13px; font-weight: bold; border: none; cursor: pointer;
         }
 
+        /* Secao Oferta do Dia estilo grandes apps */
+        .secao-ofertas {
+            max-width: 720px; margin: 16px auto 4px; padding: 0 16px; display: none;
+        }
+        .titulo-ofertas {
+            display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 900;
+            color: var(--amarelo); margin-bottom: 10px;
+        }
+        .carrossel-ofertas {
+            display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px;
+        }
+        .card-oferta {
+            min-width: 235px; max-width: 235px; background: linear-gradient(160deg, #2b2106 0%, #171717 100%);
+            border: 2px solid var(--amarelo); border-radius: 14px; padding: 12px;
+            cursor: pointer; flex-shrink: 0; position: relative; transition: transform 0.2s;
+        }
+        .card-oferta:hover { transform: translateY(-2px); }
+        .selo-oferta {
+            position: absolute; top: 10px; left: 10px; background: #ff3d00; color: #fff;
+            font-size: 11px; font-weight: 900; padding: 3px 8px; border-radius: 20px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        }
+        .oferta-foto {
+            width: 100%; height: 115px; object-fit: cover; border-radius: 10px;
+            margin-bottom: 8px; background: #111;
+        }
+        .preco-antigo {
+            text-decoration: line-through; color: #888; font-size: 12px; margin-right: 6px; font-weight: normal;
+        }
+
         .categorias {
             display: flex; gap: 8px; overflow-x: auto; padding: 14px 16px;
             position: sticky; top: 0; background: var(--bg); z-index: 10; border-bottom: 1px solid #262626;
@@ -60,12 +90,16 @@
             align-items: center; gap: 12px; cursor: pointer; transition: 0.2s;
         }
         .prod-card:hover { border-color: var(--amarelo); }
+        .prod-card.em-oferta { border-color: rgba(255, 193, 7, 0.55); }
         .prod-thumb {
             width: 82px; height: 82px; border-radius: 10px; object-fit: cover;
             flex-shrink: 0; border: 1px solid #333; background: #111;
         }
         .prod-info { flex: 1; }
-        .prod-info h3 { font-size: 16px; margin-bottom: 4px; color: #fff; }
+        .prod-info h3 { font-size: 16px; margin-bottom: 4px; color: #fff; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .tag-oferta-mini {
+            background: #ff3d00; color: #fff; font-size: 10px; padding: 2px 7px; border-radius: 10px; font-weight: 800;
+        }
         .prod-info p { font-size: 13px; color: var(--cinza); margin-bottom: 8px; line-height: 1.3; }
         .prod-preco { color: var(--amarelo); font-weight: 800; font-size: 16px; }
         .btn-add-mini {
@@ -80,7 +114,6 @@
             align-items: center; font-weight: 800; cursor: pointer; box-shadow: 0 8px 25px rgba(255, 193, 7, 0.35); z-index: 20;
         }
 
-        /* Rodape com botao do administrador no canto esquerdo */
         footer {
             display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
             padding: 22px 18px; color: #666; font-size: 12px;
@@ -110,6 +143,8 @@
             padding: 11px; border-radius: 8px; font-size: 14px;
         }
         .grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
+        .linha-cupom { display: flex; gap: 8px; margin-top: 4px; }
+        .linha-cupom input { flex: 1; text-transform: uppercase; }
         .btn-principal {
             width: 100%; background: var(--amarelo); color: #000; border: none;
             padding: 14px; border-radius: 10px; font-size: 16px; font-weight: 800; cursor: pointer; margin-top: 16px;
@@ -188,6 +223,12 @@
         </a>
     </div>
 </header>
+
+<!-- DESTAQUE: OFERTAS DO DIA -->
+<div class="secao-ofertas" id="secaoOfertas">
+    <div class="titulo-ofertas">🔥 Ofertas do Dia</div>
+    <div class="carrossel-ofertas" id="carrosselOfertas"></div>
+</div>
 
 <div class="categorias" id="barraCategorias"></div>
 <div class="container" id="listaProdutos">Carregando cardápio...</div>
@@ -353,6 +394,14 @@
         </div>
         <div id="itensCheckout" style="margin-bottom: 14px;"></div>
 
+        <!-- CUPOM DE DESCONTO -->
+        <label>🎟️ Tem cupom de desconto? (opcional)</label>
+        <div class="linha-cupom">
+            <input id="ckCupom" placeholder="Ex: PSIU10">
+            <button class="btn-secundario" type="button" onclick="aplicarCupom()">Aplicar</button>
+        </div>
+        <div id="msgCupom" style="font-size:12px; margin-top:4px; display:none;"></div>
+
         <label>Seu Nome:</label>
         <input id="ckNome" placeholder="Ex: Poliana">
         <label>Seu WhatsApp (com DDD):</label>
@@ -414,6 +463,9 @@
             <div style="display:flex; justify-content:space-between; color:var(--cinza);">
                 <span id="labelTaxa">Taxa de Entrega:</span> <span id="resTaxa">Calculando...</span>
             </div>
+            <div id="linhaDesconto" style="display:none; justify-content:space-between; color:#4cd964;">
+                <span id="labelDesconto">Desconto:</span> <span id="resDesconto">- R$ 0,00</span>
+            </div>
             <div style="display:flex; justify-content:space-between; font-size:19px; font-weight:900; color:var(--amarelo); margin-top:6px;">
                 <span>Total:</span> <span id="resTotal">R$ 0,00</span>
             </div>
@@ -460,8 +512,10 @@
     let taxaCalculada = 0.0;
     let distanciaCalculada = 0.0;
     let linkMapsCalculado = "";
+    let cupomAplicado = null;
 
     const fmt = v => "R$ " + Number(v).toFixed(2).replace(".", ",");
+    const precoEfetivo = p => (p.oferta_dia && p.preco_oferta && p.preco_oferta > 0) ? Number(p.preco_oferta) : Number(p.preco);
 
     const MENSAGENS_STATUS = {
         "Recebido": "📩 Pedido recebido! Aguardando confirmação...",
@@ -496,8 +550,66 @@
         }
 
         carregarClienteLocal();
+        renderizarOfertas();
         renderizarCategorias();
         renderizarProdutos();
+    }
+
+    function renderizarOfertas() {
+        const ofertas = DADOS.produtos.filter(p => p.oferta_dia === 1);
+        const sec = document.getElementById("secaoOfertas");
+        if (ofertas.length === 0) {
+            sec.style.display = "none";
+            return;
+        }
+        sec.style.display = "block";
+        document.getElementById("carrosselOfertas").innerHTML = ofertas.map(p => {
+            const temDesc = p.preco_oferta && p.preco_oferta > 0 && p.preco_oferta < p.preco;
+            return `
+            <div class="card-oferta" onclick="abrirProduto(${p.id})">
+                <span class="selo-oferta">🔥 OFERTA DO DIA</span>
+                ${p.imagem ? `<img src="${p.imagem}" alt="${p.nome}" class="oferta-foto">` : ''}
+                <h4 style="font-size:15px; color:#fff; margin-bottom:4px;">${p.nome}</h4>
+                <div style="font-size:12px; color:#ccc; margin-bottom:8px; height:32px; overflow:hidden;">${p.descricao || ""}</div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div class="prod-preco">
+                        ${temDesc ? `<span class="preco-antigo">${fmt(p.preco)}</span>` : ''}
+                        ${fmt(precoEfetivo(p))}
+                    </div>
+                    <span style="background:var(--amarelo); color:#000; padding:4px 8px; border-radius:6px; font-size:11px; font-weight:900;">+ Carrinho</span>
+                </div>
+            </div>`;
+        }).join("");
+    }
+
+    async function aplicarCupom() {
+        const codigo = document.getElementById("ckCupom").value.trim().toUpperCase();
+        const subtotal = carrinho.reduce((acc, i) => acc + i.total_item, 0);
+        const msgEl = document.getElementById("msgCupom");
+
+        if (!codigo) {
+            cupomAplicado = null;
+            msgEl.style.display = "none";
+            atualizarResumoCheckout();
+            return;
+        }
+
+        const r = await fetch("/api/cupons/validar", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ codigo, subtotal })
+        });
+        const d = await r.json();
+        msgEl.style.display = "block";
+        if (d.valido) {
+            cupomAplicado = d;
+            msgEl.style.color = "#4cd964";
+            msgEl.innerText = `✅ Cupom ${d.codigo} aplicado! Desconto de ${fmt(d.desconto)}.`;
+        } else {
+            cupomAplicado = null;
+            msgEl.style.color = "#ff6b6b";
+            msgEl.innerText = `❌ ${d.erro}`;
+        }
+        atualizarResumoCheckout();
     }
 
     async function buscarCep(prefixo) {
@@ -810,17 +922,25 @@
 
     function renderizarProdutos() {
         const lista = categoriaAtual === "Todos" ? DADOS.produtos : DADOS.produtos.filter(p => p.categoria === categoriaAtual);
-        document.getElementById("listaProdutos").innerHTML = lista.map(p => `
-            <div class="prod-card" onclick="abrirProduto(${p.id})">
+        document.getElementById("listaProdutos").innerHTML = lista.map(p => {
+            const temDesc = p.oferta_dia && p.preco_oferta && p.preco_oferta > 0 && p.preco_oferta < p.preco;
+            return `
+            <div class="prod-card ${p.oferta_dia ? 'em-oferta' : ''}" onclick="abrirProduto(${p.id})">
                 ${p.imagem ? `<img src="${p.imagem}" alt="${p.nome}" class="prod-thumb">` : ''}
                 <div class="prod-info">
-                    <h3>${p.nome}</h3>
+                    <h3>
+                        ${p.nome}
+                        ${p.oferta_dia ? '<span class="tag-oferta-mini">🔥 OFERTA</span>' : ''}
+                    </h3>
                     <p>${p.descricao || ""}</p>
-                    <div class="prod-preco">${fmt(p.preco)}</div>
+                    <div class="prod-preco">
+                        ${temDesc ? `<span class="preco-antigo">${fmt(p.preco)}</span>` : ''}
+                        ${fmt(precoEfetivo(p))}
+                    </div>
                 </div>
                 <button class="btn-add-mini">+ Adicionar no carrinho</button>
-            </div>
-        `).join("");
+            </div>`;
+        }).join("");
     }
 
     function abrirProduto(id) {
@@ -874,7 +994,7 @@
 
     function atualizarBtnProduto() {
         const somaAds = obterAdicionaisMarcados().reduce((acc, a) => acc + a.preco, 0);
-        const total = (produtoSelecionado.preco + somaAds) * qtdSelecionada;
+        const total = (precoEfetivo(produtoSelecionado) + somaAds) * qtdSelecionada;
         document.getElementById("mpBtnAdd").innerText = `Adicionar no carrinho • ${fmt(total)}`;
     }
 
@@ -884,7 +1004,7 @@
         carrinho.push({
             nome: produtoSelecionado.nome, qtd: qtdSelecionada, adicionais: ads,
             obs: produtoSelecionado.categoria === "Bebidas" ? "" : document.getElementById("mpObs").value.trim(),
-            total_item: (produtoSelecionado.preco + somaAds) * qtdSelecionada
+            total_item: (precoEfetivo(produtoSelecionado) + somaAds) * qtdSelecionada
         });
         fecharModal("modalProduto"); atualizarBarraCarrinho();
     }
@@ -951,9 +1071,21 @@
     function atualizarResumoCheckout() {
         const subtotal = carrinho.reduce((acc, i) => acc + i.total_item, 0);
         const taxa = tipoEntrega === "Retirada" ? 0 : taxaCalculada;
+        let desc = 0;
+        if (cupomAplicado) {
+            desc = cupomAplicado.tipo === "percentual"
+                ? Math.round(subtotal * (cupomAplicado.valor / 100) * 100) / 100
+                : Math.min(subtotal, cupomAplicado.valor);
+            document.getElementById("linhaDesconto").style.display = "flex";
+            document.getElementById("labelDesconto").innerText = `Desconto (${cupomAplicado.codigo}):`;
+            document.getElementById("resDesconto").innerText = `- ${fmt(desc)}`;
+        } else {
+            document.getElementById("linhaDesconto").style.display = "none";
+        }
+        const total = Math.max(0, subtotal + taxa - desc);
         document.getElementById("resSub").innerText = fmt(subtotal);
         document.getElementById("resTaxa").innerText = tipoEntrega === "Retirada" ? "Grátis" : fmt(taxa);
-        document.getElementById("resTotal").innerText = fmt(subtotal + taxa);
+        document.getElementById("resTotal").innerText = fmt(total);
     }
 
     async function enviarPedido() {
@@ -973,6 +1105,13 @@
 
         const subtotal = carrinho.reduce((acc, i) => acc + i.total_item, 0);
         const taxa = tipoEntrega === "Retirada" ? 0 : taxaCalculada;
+        const desc = cupomAplicado
+            ? (cupomAplicado.tipo === "percentual"
+                ? Math.round(subtotal * (cupomAplicado.valor / 100) * 100) / 100
+                : Math.min(subtotal, cupomAplicado.valor))
+            : 0;
+        const total = Math.max(0, subtotal + taxa - desc);
+
         const enderecoFmt = tipoEntrega === "Entrega"
             ? `${rua}, ${numero} - ${bairro}` + (comp ? ` (${comp})` : "")
             : "Retirada no Balcão";
@@ -983,7 +1122,9 @@
             lat: gpsLat, lng: gpsLng, link_maps: linkMapsCalculado, distancia_km: distanciaCalculada,
             forma_pagamento: document.getElementById("ckPagamento").value,
             troco_para: document.getElementById("ckTroco").value.trim(),
-            itens: carrinho, subtotal, taxa_entrega: taxa, total: subtotal + taxa
+            itens: carrinho, subtotal, taxa_entrega: taxa,
+            cupom_codigo: cupomAplicado ? cupomAplicado.codigo : "",
+            desconto: desc, total
         };
 
         const r = await fetch("/api/pedidos", {
@@ -993,7 +1134,10 @@
         const res = await r.json();
         if (res.sucesso) {
             ultimoPedido = res.pedido;
-            carrinho = []; atualizarBarraCarrinho();
+            carrinho = []; cupomAplicado = null;
+            document.getElementById("ckCupom").value = "";
+            document.getElementById("msgCupom").style.display = "none";
+            atualizarBarraCarrinho();
             fecharModal("modalCheckout"); abrirRastreio(ultimoPedido.id);
         } else {
             alert(res.erro || "Não foi possível enviar o pedido.");
@@ -1050,6 +1194,7 @@
             ? `🛵 *Entrega:* ${p.endereco}` + (p.link_maps ? `\n📍 *Localização:* ${p.link_maps}` : "")
             : `🏪 *Retirada no Balcão (Grátis)*`;
         let blocoTroco = p.troco_para ? `\n💵 *Troco para:* R$ ${p.troco_para}` : "";
+        let blocoDesc = p.desconto > 0 ? `\n🎟️ Desconto (${p.cupom_codigo}): - ${fmt(p.desconto)}` : "";
 
         const texto =
 `🍔 *NOVO PEDIDO #${p.id} — ${DADOS.loja}*
@@ -1061,7 +1206,7 @@ ${blocoEntrega}
 ${listaItens}
 
 Subtotal: ${fmt(p.subtotal)}
-Taxa de entrega: ${p.taxa_entrega > 0 ? fmt(p.taxa_entrega) : "Grátis"}
+Taxa de entrega: ${p.taxa_entrega > 0 ? fmt(p.taxa_entrega) : "Grátis"}${blocoDesc}
 💰 *TOTAL: ${fmt(p.total)}*
 
 💳 *Pagamento:* ${p.forma_pagamento}${blocoTroco}`;
